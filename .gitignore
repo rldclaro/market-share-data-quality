@@ -1,0 +1,38 @@
+# =============================================================
+# 1. LGPD / minimização de dados
+# Contém nome, e-mail e telefone de contatos (mesmo sintéticos).
+# Não é necessário para o Market Share -> nunca vai para o Git.
+# =============================================================
+data/raw/sensitive_store_contacts.csv
+
+# =============================================================
+# 2. Estado local da Databricks CLI / Asset Bundles
+# Cache e metadados do deploy, gerados na sua máquina.
+# =============================================================
+.databricks/
+
+# =============================================================
+# 3. Segredos — nunca versionar
+# Credenciais, tokens e variáveis de ambiente locais.
+# =============================================================
+.env
+.env.*
+.databrickscfg
+*.pem
+*.key
+
+# =============================================================
+# 4. Python / ferramentas
+# Gerado automaticamente; não é código-fonte.
+# =============================================================
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# =============================================================
+# 5. Sistema / editor
+# =============================================================
+.DS_Store
+Thumbs.db
+.vscode/settings.json
