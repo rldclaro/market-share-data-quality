@@ -1,0 +1,41 @@
+# Catálogo de regras de Data Quality.
+#
+# se_falhar = classificação do registro que viola a regra:
+#   APROVADO                  -> regra informativa (só conta, não penaliza)
+#   CORRIGIDO_AUTOMATICAMENTE -> correção segura, determinística e auditável
+#   APROVADO_COM_ALERTA       -> utilizável, requer monitoramento
+#   QUARENTENA                -> falha crítica ou ambiguidade sem correção segura
+#   REJEITADO                 -> descartado com justificativa (ex.: cópia de duplicata exata)
+#
+# severidade: CRITICA | ALTA | MEDIA | BAIXA | INFO
+
+regras:
+  - id: ING_001
+    descricao: Volume de linhas igual ao declarado no README do case
+    dimensao: RECONCILIACAO
+    escopo: arquivo de origem
+    severidade: ALTA
+    criterio: "linhas carregadas na Bronze == volume declarado"
+    tratamento: "alerta; divergência interrompe o pipeline"
+    se_falhar: APROVADO_COM_ALERTA
+
+  - id: FCT_001
+    descricao: Duplicata exata na fato
+    dimensao: UNICIDADE
+    escopo: fato (todas as colunas)
+    severidade: BAIXA
+    criterio: "mesmo _row_hash aparece mais de uma vez no mesmo fornecedor"
+    tratamento: "mantém 1 ocorrência; as cópias são rejeitadas com o payload original"
+    se_falhar: REJEITADO
+
+  - id: FCT_002
+    descricao: Mesma chave com versões conflitantes no mesmo fornecedor
+    dimensao: UNICIDADE
+    escopo: semana x loja x EAN
+    severidade: CRITICA
+    criterio: "1 versão por chave depois de remover duplicatas exatas"
+    tratamento: >
+      quarentena de TODAS as versões. O grão é semanal (1 linha por chave), as versões vêm
+      em geral do mesmo arquivo e o preço médio é incoerente entre elas; sem número de versão,
+      a carga mais recente não prova ser a correta
+    se_falhar: QUARENTENA
