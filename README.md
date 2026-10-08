@@ -32,9 +32,11 @@ manter rastreabilidade do dado original.
 | `docs/` | documentação e matriz de requisitos |
 | `scripts/` | automação do ambiente (Databricks CLI) |
 | `src/dq/` | framework de Data Quality (classes reutilizáveis) |
-| `config/` | catálogo de regras de DQ (`dq_rules.yml`) |
+| `src/silver/` | regras de tratamento de cada entidade da Silver |
+| `config/` | catálogo de regras de DQ (`dq_rules.yml`) e referências das correções (`referencias.yml`) |
 | `sql/profiling/` | consultas que evidenciam cada problema encontrado |
-| `notebooks/` | notebooks Databricks (formato `.py`, versionável) |
+| `notebooks/` | notebooks do pipeline (formato `.py`, versionável) |
+| `notebooks/dev/` | notebooks de validação do ambiente e do framework (fora do pipeline) |
 | `databricks.yml` | definição do projeto como código (Databricks Asset Bundle) |
 
 ## Como executar
@@ -107,6 +109,41 @@ Cópia fiel dos arquivos de origem em tabelas Delta (`ms_bronze.*`), sem nenhuma
 | `coverage_provider` | 6.370 |
 | `fact_provider_a` | 68.526 |
 | `fact_provider_b` | 58.526 |
+
+### Silver · dimensão de produto (`src/silver/produto.py`)
+
+Resultado: **1.235 registros → 1.200 produtos, 1 por EAN** (1.098 aprovados, 71 corrigidos,
+31 com alerta).
+
+| Regra | Problema | Tratamento | Registros |
+|---|---|---|---|
+| PRD_004 | texto despadronizado (`delta tabletes 1l  `) | trim + maiúsculas | 95 corrigidos |
+| PRD_005 | grafia da categoria (`CHOCOLATE`, `LACTEO`) | de-para para o domínio oficial | 6 corrigidos |
+| PRD_006 | categoria vazia | deriva da hierarquia subcategoria → categoria | 3 corrigidos |
+| PRD_002 | EAN duplicado (registro `PX####` "NOVA EMB" com categoria `OUTROS`) | mantém o id canônico `P#####`; o alias é rejeitado e listado em `alias_product_ids` | 35 rejeitados |
+| PRD_007 | categoria válida, porém em conflito com a subcategoria (ex.: `CEREAIS` em `BEBIDAS`) | corrige pela hierarquia **somente** se a descrição confirma a subcategoria | 8 corrigidos |
+| PRD_008 | conflito sem evidência na descrição | mantém + alerta | 0 |
+| PRD_003 | EAN fora do padrão de 13 dígitos (`891…`, `EAN-000…`) | **não corrige**: a fato usa o mesmo código e corrigir só o cadastro quebraria o join. Gera `ean_sugerido` para o time de cadastro | 31 alertas |
+
+**Por que deduplicar o EAN:** ele é a chave do join com a fato. Com dois registros para o mesmo
+EAN, cada venda desses produtos seria contada duas vezes.
+
+**Hierarquia derivada dos dados.** Não existe cadastro mestre de categorias no case, então o
+de-para subcategoria → categoria é calculado a partir dos próprios produtos (categoria dominante)
+e gravado com a evidência em `ms_silver.ref_hierarquia_produto`. Só é usado para corrigir quando a
+concordância é de pelo menos 90% (configurável); as 5 subcategorias ficaram entre 96,7% e 98,5%.
+
+| Subcategoria | Categoria oficial | Evidência |
+|---|---|---|
+| CAFE | BEBIDAS | 98,2% |
+| CEREAIS | NUTRICAO | 96,7% |
+| LEITE EM PO | LACTEOS | 98,5% |
+| TABLETES | CHOCOLATES | 96,8% |
+| TEMPEROS | CULINARIOS | 98,0% |
+
+**Premissa:** a subcategoria é o atributo confiável (sem nulos, sem variação de grafia e presente
+na descrição do produto); a categoria é derivada dela. Em produção, essa referência viria do
+cadastro mestre (MDM) e o EAN seria validado pelo dígito verificador GS1.
 
 ## Framework de Data Quality (`src/dq/`)
 
