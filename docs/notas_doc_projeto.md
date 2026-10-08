@@ -104,3 +104,12 @@
 - EAN malformado NÃO corrigido: existe igual no cadastro e na fato (EAN-00000635 → P00635); corrigir um lado quebra o join. ean_sugerido = 7891000 + nº do product_id.
 - Catálogo real Nestlé Professional (PDF) avaliado e NÃO usado: dados do case são sintéticos (join ~0), README proíbe dados reais no repo, taxonomia diferente. Uso como argumento: EANs reais têm 13 dígitos e prefixo 7891000 (GS1 Brasil = 789) → reforça que 891... perdeu o 7. Produção: MDM + dígito verificador GS1 + Cadastro Nacional de Produtos.
 - Notebooks de validação movidos para notebooks/dev (hello, demo_dq_engine); demo limpa o que grava; raiz do projeto encontrada subindo até o databricks.yml.
+
+## Etapa 5 — loja, território e calendário
+- Resultado validado no Databricks (run 255988177559075): dim_loja 2.500 (2.285 aprov., 48 corr., 167 alerta); território 4.736 vigências, 0 sobreposições; log com 24 regras.
+- **UF (LOJ_002):** "São Paulo" é nome de CIDADE no campo de ESTADO → de-para erraria BH/Curitiba. UF derivada da cidade (dominante, trava 90%), mesma técnica da hierarquia de produto. 20 lojas.
+- **CNPJ (LOJ_003):** maioria sem máscara → padrão; só formatação, 14 dígitos, sem duplicar. 35 lojas.
+- **Coordenada (LOJ_004/005) — decisão do Rildo: não alterar, alertar.** Critério com fonte oficial (pontos extremos IBGE). As 10 têm indício de inversão, mas o campo inteiro é sintético (centro das cidades igual, correlação ~0, 0,3% a < 50 km). Corrigir = trocar erro visível por erro invisível. Coordenada fora do MS. Fila `ms_dq.vw_revalidacao_loja` + melhoria endereço/CEP. Erro meu admitido: eu tinha afirmado que inverter "acertava" a localização; a verificação de distância mostrou que não.
+- **Vigências (TER_001):** 121 sobreposições CRM 2025 × MANUAL 2026 → venda duplicaria no join. Fecha em próximo início − 1 dia (SCD2). Território depende de loja × categoria. Fallback: histórico → dim_loja → SEM_TERRITORIO.
+- **Calendário (CAL_001/004) — decisão do Rildo: ISO.** Fonte misturava ISO (year_week) e civil (year/month da segunda). Quinta-feira = dia do meio = mês com 4 de 7 dias ("mês real"). 1 ano + 9 meses corrigidos. Efeito: semanas por mês mudam; 2026-40 vai para outubro.
+- Princípio consolidado: corrige o que tem prova (UF, CNPJ, vigência, calendário); alerta o que não tem (coordenada, EAN malformado); toda correção com `_raw` + `corrections` + reconciliação log × trilha (`sql/validacao`).

@@ -1,5 +1,5 @@
 -- =============================================================================
--- Validação · Silver · dimensões (produto, loja, território)
+-- Validação · Silver · dimensões (produto, loja, território, calendário)
 -- Objetivo: provar que toda correção, alerta e quarentena está registrada e bate entre si.
 -- Rodar depois do job (task silver_dimensoes). Tabelas: ms_silver.*, ms_dq.*
 -- =============================================================================
@@ -9,13 +9,13 @@
 SELECT regra_id, alvo, severidade, avaliados, falhas, pct_falha, resultado, detalhes
 FROM workspace.ms_dq.rule_results
 WHERE run_id = (SELECT max_by(run_id, executado_em) FROM workspace.ms_dq.rule_results
-                WHERE alvo IN ('dim_produto', 'dim_loja', 'territorio_historico'))
+                WHERE alvo IN ('dim_produto', 'dim_loja', 'territorio_historico', 'dim_calendario'))
 ORDER BY alvo, regra_id;
 
 -- 1.2 Histórico: a mesma regra ao longo das execuções (deve ser estável com a mesma entrada)
 SELECT regra_id, run_id, executado_em, falhas
 FROM workspace.ms_dq.rule_results
-WHERE alvo IN ('dim_produto', 'dim_loja', 'territorio_historico')
+WHERE alvo IN ('dim_produto', 'dim_loja', 'territorio_historico', 'dim_calendario')
 ORDER BY regra_id, executado_em DESC;
 
 -- 2. TRILHA DE CORREÇÕES
@@ -44,7 +44,7 @@ ORDER BY regra_id;
 WITH ultimo AS (
   SELECT * FROM workspace.ms_dq.rule_results
   WHERE run_id = (SELECT max_by(run_id, executado_em) FROM workspace.ms_dq.rule_results
-                  WHERE alvo IN ('dim_produto', 'dim_loja', 'territorio_historico'))
+                  WHERE alvo IN ('dim_produto', 'dim_loja', 'territorio_historico', 'dim_calendario'))
     AND resultado = 'CORRIGIDO_AUTOMATICAMENTE'
 ),
 trilha AS (
@@ -60,7 +60,7 @@ ORDER BY u.alvo, u.regra_id;
 WITH ultimo AS (
   SELECT * FROM workspace.ms_dq.rule_results
   WHERE run_id = (SELECT max_by(run_id, executado_em) FROM workspace.ms_dq.rule_results
-                  WHERE alvo IN ('dim_produto', 'dim_loja', 'territorio_historico'))
+                  WHERE alvo IN ('dim_produto', 'dim_loja', 'territorio_historico', 'dim_calendario'))
     AND regra_id IN (SELECT DISTINCT regra_id FROM workspace.ms_dq.quarantine)
 )
 SELECT u.alvo, u.regra_id, u.resultado, u.falhas AS falhas_no_log,
@@ -106,6 +106,21 @@ FROM workspace.ms_silver.dim_produto
 WHERE arrays_overlap(dq_flags, array('PRD_005', 'PRD_006', 'PRD_007'))
 ORDER BY subcategory, product_id;
 
+-- 4.6 Calendário · ano e mês ISO (CAL_001 = 1 semana, CAL_004 = 9 semanas)
+SELECT year_week, week_start_date, week_end_date, date_add(week_start_date, 3) AS quinta_feira,
+       year_raw, year, month_raw, month, dq_flags
+FROM workspace.ms_silver.dim_calendario
+WHERE size(dq_flags) > 0
+ORDER BY week_start_date;
+
+-- 4.7 Calendário · semanas por mês, antes (civil) x depois (ISO)
+SELECT coalesce(c.mes, i.mes) AS mes, coalesce(c.semanas, 0) AS semanas_civil, coalesce(i.semanas, 0) AS semanas_iso
+FROM (SELECT format_string('%d-%02d', year_raw, month_raw) AS mes, COUNT(*) AS semanas
+      FROM workspace.ms_silver.dim_calendario GROUP BY 1) c
+FULL JOIN (SELECT format_string('%d-%02d', year, month) AS mes, COUNT(*) AS semanas
+           FROM workspace.ms_silver.dim_calendario GROUP BY 1) i USING (mes)
+ORDER BY mes;
+
 -- 5. GARANTIAS (todas devem retornar 0)
 SELECT 'produto: EAN duplicado' AS garantia,
        COUNT(*) - COUNT(DISTINCT ean) AS violacoes FROM workspace.ms_silver.dim_produto
@@ -128,7 +143,14 @@ UNION ALL
 SELECT 'território: vigência sobreposta', COUNT(*)
 FROM (SELECT valid_to, LEAD(valid_from) OVER (PARTITION BY store_id, category ORDER BY valid_from) AS prox
       FROM workspace.ms_silver.territorio_historico)
-WHERE prox IS NOT NULL AND valid_to >= prox;
+WHERE prox IS NOT NULL AND valid_to >= prox
+UNION ALL
+SELECT 'calendário: ano/mês fora do ISO',
+       COUNT_IF(year <> year(date_add(week_start_date, 3)) OR month <> month(date_add(week_start_date, 3)))
+FROM workspace.ms_silver.dim_calendario
+UNION ALL
+SELECT 'calendário: semana quebrada ou duplicada',
+       COUNT_IF(arrays_overlap(dq_flags, array('CAL_002', 'CAL_003'))) FROM workspace.ms_silver.dim_calendario;
 
 -- 6. VISÃO DE NEGÓCIO
 -- 6.1 Status final por tabela
@@ -137,12 +159,14 @@ UNION ALL
 SELECT 'dim_loja', dq_status, COUNT(*) FROM workspace.ms_silver.dim_loja GROUP BY ALL
 UNION ALL
 SELECT 'territorio_historico', dq_status, COUNT(*) FROM workspace.ms_silver.territorio_historico GROUP BY ALL
+UNION ALL
+SELECT 'dim_calendario', dq_status, COUNT(*) FROM workspace.ms_silver.dim_calendario GROUP BY ALL
 ORDER BY tabela, dq_status;
 
 -- 6.2 Quarentena das dimensões, por regra
 SELECT alvo, regra_id, classificacao, COUNT(*) AS registros, MIN(motivo) AS exemplo_motivo
 FROM workspace.ms_dq.quarantine
-WHERE alvo IN ('dim_produto', 'dim_loja', 'territorio_historico')
+WHERE alvo IN ('dim_produto', 'dim_loja', 'territorio_historico', 'dim_calendario')
 GROUP BY ALL
 ORDER BY alvo, regra_id;
 

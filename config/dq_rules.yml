@@ -248,3 +248,44 @@ regras:
     criterio: "1 linha por loja x categoria x valid_from"
     tratamento: "quarentena de todas as versões (duas vigências no mesmo dia não têm vencedora segura)"
     se_falhar: QUARENTENA
+
+  # ------------------------------------------------------------------ CALENDÁRIO (dim_calendario)
+  - id: CAL_001
+    descricao: Ano no padrão ISO 8601 (ano da quinta-feira)
+    dimensao: CONSISTENCIA
+    escopo: dim_calendario.year
+    severidade: MEDIA
+    criterio: "year = ano(week_start_date + 3 dias)"
+    tratamento: >
+      padroniza para ISO, a mesma convenção do year_week. A origem usa o ano civil da segunda-feira:
+      a semana 2026-01 começa em 29/12/2025 e vinha com year = 2025. Original em year_raw
+    se_falhar: CORRIGIDO_AUTOMATICAMENTE
+
+  - id: CAL_004
+    descricao: Mês no padrão ISO 8601 (mês da quinta-feira = mês real da semana)
+    dimensao: CONSISTENCIA
+    escopo: dim_calendario.month
+    severidade: MEDIA
+    criterio: "month = mês(week_start_date + 3 dias)"
+    tratamento: >
+      a quinta-feira é o dia do meio da semana: o mês dela contém 4 dos 7 dias (mês real).
+      A origem usa o mês da segunda-feira, que erra nas semanas que cruzam o mês. Original em month_raw
+    se_falhar: CORRIGIDO_AUTOMATICAMENTE
+
+  - id: CAL_002
+    descricao: Semana completa e contínua (segunda a domingo, sem lacunas)
+    dimensao: VALIDADE
+    escopo: dim_calendario.week_start_date / week_end_date
+    severidade: CRITICA
+    criterio: "início na segunda, fim = início + 6 dias, próxima semana começa 7 dias depois"
+    tratamento: "bloqueia o pipeline: sem um calendário íntegro não há grão semanal confiável para o Market Share"
+    se_falhar: REJEITADO
+
+  - id: CAL_003
+    descricao: year_week único e coerente com a data de início
+    dimensao: UNICIDADE
+    escopo: dim_calendario.year_week
+    severidade: CRITICA
+    criterio: "1 linha por year_week e year_week = semana ISO de week_start_date"
+    tratamento: "bloqueia o pipeline: chave do join com as fatos"
+    se_falhar: REJEITADO

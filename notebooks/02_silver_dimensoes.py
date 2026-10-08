@@ -10,6 +10,7 @@
 # MAGIC | Produto | `ms_silver.dim_produto` + `ms_silver.ref_hierarquia_produto` |
 # MAGIC | Loja | `ms_silver.dim_loja` + `ms_silver.ref_cidade_uf` + `ms_dq.vw_revalidacao_loja` |
 # MAGIC | Território | `ms_silver.territorio_historico` (SCD2 por loja x categoria) |
+# MAGIC | Calendário | `ms_silver.dim_calendario` (semana ISO 8601; ano e mês da quinta-feira) |
 
 # COMMAND ----------
 
@@ -45,6 +46,7 @@ from pyspark.sql import functions as F
 
 from dq.engine import DQEngine
 from dq.models import CatalogoRegras
+from silver.calendario import CalendarioBuilder
 from silver.loja import LojaBuilder
 from silver.produto import ProdutoBuilder
 from silver.territorio import TerritorioBuilder
@@ -137,6 +139,31 @@ print(f"territorio_historico: {th.count()} vigências | sobreposições restante
 assert residual == 0, "vigências sobrepostas após a TER_001"
 
 display(th.where("store_id = 'S00009'").orderBy("category", "valid_from"))
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Calendário
+
+# COMMAND ----------
+
+calendario = CalendarioBuilder(spark, engine)
+dim_calendario = calendario.build(spark.table(f"{BRONZE}.dim_calendario"))
+
+(dim_calendario.write.format("delta").mode("overwrite").option("overwriteSchema", "true")
+               .saveAsTable(f"{SILVER}.dim_calendario"))
+
+# COMMAND ----------
+
+# Garantia: calendário íntegro (CAL_002 / CAL_003 são REJEITADO = bloqueiam o pipeline)
+dc = spark.table(f"{SILVER}.dim_calendario")
+quebradas = dc.where(F.arrays_overlap("dq_flags", F.array(F.lit("CAL_002"), F.lit("CAL_003")))).count()
+print(f"dim_calendario: {dc.count()} semanas | quebradas: {quebradas}")
+assert quebradas == 0, "calendário com semana incompleta, lacuna ou year_week inválido"
+
+display(dc.where("size(dq_flags) > 0")
+          .select("year_week", "week_start_date", "week_end_date", "year_raw", "year", "month_raw", "month", "dq_flags")
+          .orderBy("week_start_date"))
 
 # COMMAND ----------
 
