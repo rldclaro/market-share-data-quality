@@ -19,7 +19,7 @@ resources:
       tasks:
         - task_key: hello
           notebook_task:
-            notebook_path: ./notebooks/00_hello.py
+            notebook_path: ./notebooks/dev/00_hello.py
             base_parameters:
               catalog: ${var.catalog}
 

@@ -6,7 +6,8 @@
 # MAGIC - **FCT_001**: duplicatas exatas (esperado: 250 cópias em A)
 # MAGIC - **FCT_002**: mesma chave com versões conflitantes (esperado: 22 linhas em A)
 # MAGIC
-# MAGIC Notebook de validação: não faz parte do pipeline e grava com o alvo `demo_fact_a`.
+# MAGIC Notebook de validação: não faz parte do pipeline. Grava com alvo `demo_fact_a` / run_id `demo`
+# MAGIC e apaga tudo no final.
 
 # COMMAND ----------
 
@@ -16,8 +17,17 @@ import sys
 dbutils.widgets.text("catalog", "workspace")
 dbutils.widgets.text("root", "")   # raiz do projeto no workspace (o job passa ${workspace.file_path})
 
+
+def raiz_do_projeto(inicio: str) -> str:
+    """Sobe as pastas até achar o databricks.yml (funciona em qualquer nível de subpasta)."""
+    p = inicio
+    while p != "/" and not os.path.exists(os.path.join(p, "databricks.yml")):
+        p = os.path.dirname(p)
+    return p
+
+
 catalog = dbutils.widgets.get("catalog")
-root = dbutils.widgets.get("root") or os.path.dirname(os.getcwd())   # fallback: pasta acima de notebooks/
+root = dbutils.widgets.get("root") or raiz_do_projeto(os.getcwd())
 sys.path.insert(0, f"{root}/src")
 print("root:", root)
 
@@ -80,7 +90,7 @@ print("linhas que seguem no fluxo:", df.count())   # esperado: 68.526 - 250 - 22
 
 # MAGIC %md
 # MAGIC ## Limpeza
-# MAGIC A demo grava com alvo `demo_fact_a` e run_id `demo`. Remove para não misturar com o pipeline.
+# MAGIC Remove o que a demo gravou, para não misturar com o pipeline.
 
 # COMMAND ----------
 
