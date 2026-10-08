@@ -4,7 +4,7 @@
 -- Rodar depois do job (task silver_dimensoes). Tabelas: ms_silver.*, ms_dq.*
 -- =============================================================================
 
--- ------------------------------------------------------------------ 1. LOG DA ÚLTIMA EXECUÇÃO
+-- 1. LOG DA ÚLTIMA EXECUÇÃO
 -- 1.1 Resultado de cada regra na última execução (rule_results é append: filtra o último run)
 SELECT regra_id, alvo, severidade, avaliados, falhas, pct_falha, resultado, detalhes
 FROM workspace.ms_dq.rule_results
@@ -18,7 +18,7 @@ FROM workspace.ms_dq.rule_results
 WHERE alvo IN ('dim_produto', 'dim_loja', 'territorio_historico')
 ORDER BY regra_id, executado_em DESC;
 
--- ------------------------------------------------------------------ 2. TRILHA DE CORREÇÕES
+-- 2. TRILHA DE CORREÇÕES
 -- 2.1 Resumo: quantos registros e colunas cada regra corrigiu
 SELECT alvo, regra_id, coluna,
        COUNT(*)              AS alteracoes,
@@ -39,7 +39,7 @@ FROM workspace.ms_dq.corrections
 WHERE alvo = 'dim_produto' AND get_json_object(chave, '$.product_id') = 'P00334'
 ORDER BY regra_id;
 
--- ------------------------------------------------------------------ 3. RECONCILIAÇÃO LOG x TRILHA
+-- 3. RECONCILIAÇÃO LOG x TRILHA
 -- 3.1 Para toda regra de correção: registros na trilha == falhas no log (diferenca deve ser 0)
 WITH ultimo AS (
   SELECT * FROM workspace.ms_dq.rule_results
@@ -70,7 +70,7 @@ FROM ultimo u LEFT JOIN workspace.ms_dq.quarantine q USING (regra_id, alvo)
 GROUP BY u.alvo, u.regra_id, u.resultado, u.falhas
 ORDER BY u.alvo, u.regra_id;
 
--- ------------------------------------------------------------------ 4. ANTES x DEPOIS NA PRÓPRIA TABELA (<coluna>_raw)
+-- 4. ANTES x DEPOIS NA PRÓPRIA TABELA (<coluna>_raw)
 -- 4.1 Loja · UF corrigida pela cidade (LOJ_002) — esperado 20
 SELECT store_id, city, state_raw AS uf_origem, state AS uf_silver, dq_flags
 FROM workspace.ms_silver.dim_loja
@@ -106,7 +106,7 @@ FROM workspace.ms_silver.dim_produto
 WHERE arrays_overlap(dq_flags, array('PRD_005', 'PRD_006', 'PRD_007'))
 ORDER BY subcategory, product_id;
 
--- ------------------------------------------------------------------ 5. GARANTIAS (todas devem retornar 0)
+-- 5. GARANTIAS (todas devem retornar 0)
 SELECT 'produto: EAN duplicado' AS garantia,
        COUNT(*) - COUNT(DISTINCT ean) AS violacoes FROM workspace.ms_silver.dim_produto
 UNION ALL
@@ -130,7 +130,7 @@ FROM (SELECT valid_to, LEAD(valid_from) OVER (PARTITION BY store_id, category OR
       FROM workspace.ms_silver.territorio_historico)
 WHERE prox IS NOT NULL AND valid_to >= prox;
 
--- ------------------------------------------------------------------ 6. VISÃO DE NEGÓCIO
+-- 6. VISÃO DE NEGÓCIO
 -- 6.1 Status final por tabela
 SELECT 'dim_produto' AS tabela, dq_status, COUNT(*) AS registros FROM workspace.ms_silver.dim_produto GROUP BY ALL
 UNION ALL
