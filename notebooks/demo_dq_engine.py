@@ -75,3 +75,15 @@ display(spark.sql(f"""
 # COMMAND ----------
 
 print("linhas que seguem no fluxo:", df.count())   # esperado: 68.526 - 250 - 22 = 68.254
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Limpeza
+# MAGIC A demo grava com alvo `demo_fact_a` e run_id `demo`. Remove para não misturar com o pipeline.
+
+# COMMAND ----------
+
+spark.sql(f"DELETE FROM {catalog}.ms_dq.quarantine WHERE alvo = '{ALVO}'")
+spark.sql(f"DELETE FROM {catalog}.ms_dq.rule_results WHERE run_id = 'demo'")
+print("Dados da demo removidos.")
