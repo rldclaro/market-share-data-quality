@@ -31,6 +31,8 @@ manter rastreabilidade do dado original.
 | `data/raw/` | dados de entrada do case (não alterados) |
 | `docs/` | documentação e matriz de requisitos |
 | `scripts/` | automação do ambiente (Databricks CLI) |
+| `notebooks/` | notebooks Databricks (formato `.py`, versionável) |
+| `databricks.yml` | definição do projeto como código (Databricks Asset Bundle) |
 
 ## Como executar
 
@@ -53,6 +55,26 @@ databricks auth login --host <URL_DO_WORKSPACE> --profile gf7
 Cria os schemas `ms_raw`, `ms_bronze`, `ms_silver`, `ms_gold` e `ms_dq` no catálogo
 `workspace` e envia os arquivos de `data/raw` para o volume `ms_raw.landing`.
 O script é idempotente: pode ser executado várias vezes sem efeito colateral.
+
+### 3. Publicar o projeto no workspace (Asset Bundle)
+
+```bash
+databricks bundle validate -t dev --profile gf7
+databricks bundle deploy   -t dev --profile gf7
+```
+
+O deploy envia os notebooks para `/Workspace/Users/<usuario>/.bundle/market_share_dq/dev/files`
+e cria os jobs definidos em `databricks.yml`. Os dados não são enviados pelo bundle
+(`sync.exclude`): a única fonte é o volume `ms_raw.landing`.
+
+### 4. Executar
+
+```bash
+databricks bundle run -t dev hello_job --profile gf7
+```
+
+Todos os jobs rodam em computação serverless (único tipo disponível no Free Edition).
+Para desenvolvimento interativo, abra o notebook na pasta do bundle e selecione **Serverless**.
 
 ## Dados sensíveis
 

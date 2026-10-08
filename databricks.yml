@@ -1,0 +1,40 @@
+# Definição do projeto para Databricks Asset Bundles.
+# Deploy: databricks bundle deploy -t dev
+bundle:
+  name: market_share_dq
+
+sync:
+  exclude:
+    - data/** # dados entram pelo Volume (scripts/setup_uc.sh), não pelo bundle
+
+variables:
+  catalog:
+    description: Catálogo do Unity Catalog
+    default: workspace
+
+resources:
+  jobs:
+    hello_job:
+      name: market-share-hello
+      tasks:
+        - task_key: hello
+          notebook_task:
+            notebook_path: ./notebooks/00_hello.py
+            base_parameters:
+              catalog: ${var.catalog}
+
+    pipeline_job:
+      name: market-share-pipeline
+      tasks:
+        - task_key: bronze
+          notebook_task:
+            notebook_path: ./notebooks/01_bronze.py
+            base_parameters:
+              catalog: ${var.catalog}
+              load_id: "{{job.run_id}}" # id único da execução, gravado em cada linha
+      # sem cluster configurado -> roda em serverless (único tipo no Free Edition)
+
+targets:
+  dev:
+    mode: development # prefixa os recursos com [dev seu_usuario] e não agenda nada
+    default: true
