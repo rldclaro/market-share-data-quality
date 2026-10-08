@@ -39,3 +39,83 @@ regras:
       em geral do mesmo arquivo e o preço médio é incoerente entre elas; sem número de versão,
       a carga mais recente não prova ser a correta
     se_falhar: QUARENTENA
+
+  # ------------------------------------------------------------------ dimensão de produto
+  - id: PRD_001
+    descricao: product_id único no cadastro
+    dimensao: UNICIDADE
+    escopo: dim_produto.product_id
+    severidade: CRITICA
+    criterio: "1 registro por product_id"
+    tratamento: "quarentena dos registros duplicados"
+    se_falhar: QUARENTENA
+
+  - id: PRD_002
+    descricao: EAN único no cadastro (chave do join com a fato)
+    dimensao: UNICIDADE
+    escopo: dim_produto.ean
+    severidade: CRITICA
+    criterio: "1 registro por EAN"
+    tratamento: >
+      sobrevivência determinística: categoria coerente com a hierarquia > id canônico P##### > menor id.
+      O alias (PX####, "NOVA EMB", categoria OUTROS) é rejeitado e listado em alias_product_ids.
+      Sem isso, o join com a fato duplicaria a venda desses EANs
+    se_falhar: REJEITADO
+
+  - id: PRD_003
+    descricao: EAN com 13 dígitos numéricos
+    dimensao: VALIDADE
+    escopo: dim_produto.ean
+    severidade: MEDIA
+    criterio: "ean ~ ^[0-9]{13}$"
+    tratamento: >
+      NÃO corrige: a fato usa o mesmo código malformado, então corrigir só o cadastro quebraria o join.
+      Gera ean_sugerido (7891000 + número do product_id, padrão de 100% dos EANs válidos) para o time de cadastro
+    se_falhar: APROVADO_COM_ALERTA
+
+  - id: PRD_004
+    descricao: Texto padronizado
+    dimensao: VALIDADE
+    escopo: dim_produto (colunas de texto)
+    severidade: BAIXA
+    criterio: "sem espaços extras e em maiúsculas"
+    tratamento: "trim + maiúsculas + espaço único; original em <coluna>_raw"
+    se_falhar: CORRIGIDO_AUTOMATICAMENTE
+
+  - id: PRD_005
+    descricao: Categoria com grafia fora do domínio oficial
+    dimensao: VALIDADE
+    escopo: dim_produto.category
+    severidade: ALTA
+    criterio: "category não é sinônimo conhecido (config/referencias.yml)"
+    tratamento: "de-para de grafia (CHOCOLATE -> CHOCOLATES, LACTEO -> LACTEOS)"
+    se_falhar: CORRIGIDO_AUTOMATICAMENTE
+
+  - id: PRD_006
+    descricao: Categoria vazia
+    dimensao: COMPLETUDE
+    escopo: dim_produto.category
+    severidade: ALTA
+    criterio: "category preenchida"
+    tratamento: "deriva da hierarquia subcategoria -> categoria (categoria dominante, evidência >= 90%)"
+    se_falhar: CORRIGIDO_AUTOMATICAMENTE
+
+  - id: PRD_007
+    descricao: Categoria em conflito com a subcategoria, com evidência na descrição
+    dimensao: CONSISTENCIA
+    escopo: dim_produto.category x subcategory
+    severidade: ALTA
+    criterio: "category == hierarquia(subcategory)"
+    tratamento: >
+      corrige pela hierarquia SOMENTE se a descrição contém a subcategoria (segunda evidência).
+      Premissa: a subcategoria é o atributo confiável (sem nulos, sem variação de grafia, presente na descrição)
+    se_falhar: CORRIGIDO_AUTOMATICAMENTE
+
+  - id: PRD_008
+    descricao: Categoria em conflito com a subcategoria, sem evidência
+    dimensao: CONSISTENCIA
+    escopo: dim_produto.category x subcategory
+    severidade: ALTA
+    criterio: "category == hierarquia(subcategory) após PRD_007"
+    tratamento: "mantém o valor de origem + alerta para o time de cadastro (correção não é segura)"
+    se_falhar: APROVADO_COM_ALERTA

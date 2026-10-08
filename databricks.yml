@@ -25,6 +25,7 @@ resources:
 
     pipeline_job:
       name: market-share-pipeline
+      # sem cluster configurado -> roda em serverless (único tipo no Free Edition)
       tasks:
         - task_key: bronze
           notebook_task:
@@ -32,7 +33,16 @@ resources:
             base_parameters:
               catalog: ${var.catalog}
               load_id: "{{job.run_id}}" # id único da execução, gravado em cada linha
-      # sem cluster configurado -> roda em serverless (único tipo no Free Edition)
+
+        - task_key: silver_dimensoes
+          depends_on:
+            - task_key: bronze # só roda se a bronze terminar bem
+          notebook_task:
+            notebook_path: ./notebooks/02_silver_dimensoes.py
+            base_parameters:
+              catalog: ${var.catalog}
+              load_id: "{{job.run_id}}"
+              root: ${workspace.file_path} # raiz do projeto no workspace (para importar src/ e ler config/)
 
 targets:
   dev:

@@ -1,0 +1,23 @@
+# Referências usadas nas correções automáticas.
+# Toda correção precisa de uma fonte explícita: ela fica aqui, versionada e revisável em PR.
+
+produto:
+  # Grafias equivalentes -> domínio oficial (evidência: sql/profiling/05_dim_produto.sql, 5.2)
+  categoria_sinonimos:
+    CHOCOLATE: CHOCOLATES
+    LACTEO: LACTEOS
+
+  # A hierarquia subcategoria -> categoria é DERIVADA dos dados (categoria dominante).
+  # Só é usada para corrigir se a concordância for >= este limite; abaixo disso fica "REVISAR".
+  hierarquia_evidencia_minima: 0.90
+
+  # Colunas de texto padronizadas (trim + maiúsculas + espaço único)
+  colunas_texto:
+    [
+      product_description,
+      brand,
+      manufacturer,
+      category,
+      subcategory,
+      package_unit,
+    ]
