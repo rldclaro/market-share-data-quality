@@ -21,3 +21,49 @@ produto:
       subcategory,
       package_unit,
     ]
+
+loja:
+  # Domínio oficial de UF (27 unidades da federação)
+  ufs_validas:
+    [
+      AC,
+      AL,
+      AP,
+      AM,
+      BA,
+      CE,
+      DF,
+      ES,
+      GO,
+      MA,
+      MT,
+      MS,
+      MG,
+      PA,
+      PB,
+      PR,
+      PE,
+      PI,
+      RJ,
+      RN,
+      RS,
+      RO,
+      RR,
+      SC,
+      SP,
+      SE,
+      TO,
+    ]
+
+  # A UF de cada cidade é DERIVADA dos dados (UF dominante entre as lojas com UF válida).
+  # Só corrige se a concordância for >= este limite (mesmo critério da hierarquia de produto).
+  uf_evidencia_minima: 0.90
+
+  # Pontos extremos do território brasileiro (continental) — critério da LOJ_004 (somente alerta).
+  # Fonte: IBGE, Brasil em Síntese – Dados geográficos
+  # https://brasilemsintese.ibge.gov.br/territorio/dados-geograficos.html
+  limites_brasil:
+    lat_norte: 5.271944 # 05°16'19" N  Monte Caburaí (RR)
+    lat_sul: -33.751944 # 33°45'07" S  Arroio Chuí (RS)
+    lon_leste: -34.792778 # 34°47'34" W  Ponta do Seixas (PB)
+    lon_oeste: -73.990556 # 73°59'26" W  nascente do rio Moa (AC)

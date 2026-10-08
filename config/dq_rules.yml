@@ -119,3 +119,132 @@ regras:
     criterio: "category == hierarquia(subcategory) após PRD_007"
     tratamento: "mantém o valor de origem + alerta para o time de cadastro (correção não é segura)"
     se_falhar: APROVADO_COM_ALERTA
+
+  # ------------------------------------------------------------------ LOJA (dim_loja)
+  - id: LOJ_001
+    descricao: store_id único
+    dimensao: UNICIDADE
+    escopo: dim_loja.store_id
+    severidade: CRITICA
+    criterio: "1 linha por store_id"
+    tratamento: "todas as versões da loja duplicada vão para quarentena (não há critério seguro de escolha)"
+    se_falhar: QUARENTENA
+
+  - id: LOJ_002
+    descricao: UF coerente com a cidade
+    dimensao: CONSISTENCIA
+    escopo: dim_loja.state x city
+    severidade: ALTA
+    criterio: "state == UF dominante da cidade (ms_silver.ref_cidade_uf, evidência >= 90%)"
+    tratamento: >
+      corrige pela UF dominante da cidade; original em state_raw. Casos: nome de cidade no campo UF
+      ('São Paulo' em lojas de BH, Curitiba...), 'XX' e vazio. A cidade é o atributo confiável
+    se_falhar: CORRIGIDO_AUTOMATICAMENTE
+
+  - id: LOJ_003
+    descricao: CNPJ com 14 dígitos, sem máscara
+    dimensao: VALIDADE
+    escopo: dim_loja.cnpj
+    severidade: BAIXA
+    criterio: "cnpj ~ ^[0-9]{14}$"
+    tratamento: "remove a máscara (. / -) quando restam exatamente 14 dígitos; original em cnpj_raw"
+    se_falhar: CORRIGIDO_AUTOMATICAMENTE
+
+  - id: LOJ_004
+    descricao: Coordenada dentro do território brasileiro
+    dimensao: VALIDADE
+    escopo: dim_loja.latitude, dim_loja.longitude
+    severidade: BAIXA
+    criterio: "latitude e longitude dentro dos pontos extremos oficiais do IBGE (config/referencias.yml)"
+    tratamento: >
+      NÃO corrige. Há indício de inversão (lat/lon trocadas voltam à faixa das demais lojas), mas o campo
+      não tem relação com a cidade (LOJ_005), então a troca não garante a localização real.
+      Marca geo_status e envia para ms_dq.vw_revalidacao_loja. Coordenada não entra no Market Share
+    se_falhar: APROVADO_COM_ALERTA
+
+  - id: LOJ_005
+    descricao: Coordenada coerente com a cidade da loja
+    dimensao: ACURACIA
+    escopo: dim_loja (dataset)
+    severidade: INFO
+    criterio: "o centro médio das coordenadas deve variar entre cidades"
+    tratamento: >
+      regra de dataset: registra que o campo não é confiável para análise geográfica.
+      Melhoria proposta: endereço + CEP na dim_loja e geocodificação por base oficial
+    se_falhar: APROVADO_COM_ALERTA
+
+  - id: LOJ_006
+    descricao: Território preenchido na loja
+    dimensao: COMPLETUDE
+    escopo: dim_loja.territory_id
+    severidade: MEDIA
+    criterio: "territory_id preenchido"
+    tratamento: "mantém vazio + alerta; na fato o território vem do histórico e cai em SEM_TERRITORIO se nada existir"
+    se_falhar: APROVADO_COM_ALERTA
+
+  - id: LOJ_007
+    descricao: Vendedor preenchido na loja
+    dimensao: COMPLETUDE
+    escopo: dim_loja.seller_id
+    severidade: BAIXA
+    criterio: "seller_id preenchido"
+    tratamento: "mantém vazio + alerta (vendedor não entra no cálculo de Market Share)"
+    se_falhar: APROVADO_COM_ALERTA
+
+  # ------------------------------------------------------------------ TERRITÓRIO (customer_territory_history)
+  - id: TER_001
+    descricao: Vigências sem sobreposição por loja x categoria
+    dimensao: CONSISTENCIA
+    escopo: customer_territory_history.valid_from / valid_to
+    severidade: ALTA
+    criterio: "valid_to < próximo valid_from da mesma loja x categoria"
+    tratamento: >
+      fecha a vigência anterior em (próximo valid_from - 1 dia); original em valid_to_raw.
+      A vigência que começa depois vence (SCD2: o histórico anterior é preservado).
+      Sem isso o join as-of com a fato devolve 2 territórios e duplica a venda
+    se_falhar: CORRIGIDO_AUTOMATICAMENTE
+
+  - id: TER_002
+    descricao: Território preenchido no histórico
+    dimensao: COMPLETUDE
+    escopo: customer_territory_history.territory_id
+    severidade: MEDIA
+    criterio: "territory_id preenchido"
+    tratamento: "mantém + alerta; na fato: fallback para dim_loja.territory_id e depois SEM_TERRITORIO"
+    se_falhar: APROVADO_COM_ALERTA
+
+  - id: TER_003
+    descricao: Loja da dimensão com histórico de território
+    dimensao: COBERTURA
+    escopo: dim_loja x customer_territory_history (dataset)
+    severidade: BAIXA
+    criterio: "toda loja da dim_loja tem ao menos uma vigência"
+    tratamento: "regra de dataset + alerta; na fato o território vem de dim_loja.territory_id (fallback)"
+    se_falhar: APROVADO_COM_ALERTA
+
+  - id: TER_004
+    descricao: Loja do histórico existe na dim_loja
+    dimensao: INTEGRIDADE_REFERENCIAL
+    escopo: customer_territory_history.store_id
+    severidade: ALTA
+    criterio: "store_id existe em ms_silver.dim_loja"
+    tratamento: "quarentena (vigência de loja desconhecida não tem onde ser aplicada)"
+    se_falhar: QUARENTENA
+
+  - id: TER_005
+    descricao: Vendedor preenchido no histórico
+    dimensao: COMPLETUDE
+    escopo: customer_territory_history.seller_id
+    severidade: BAIXA
+    criterio: "seller_id preenchido"
+    tratamento: "mantém vazio + alerta (vendedor não entra no cálculo de Market Share)"
+    se_falhar: APROVADO_COM_ALERTA
+
+  - id: TER_006
+    descricao: Vigência única por loja x categoria x início
+    dimensao: UNICIDADE
+    escopo: customer_territory_history (store_id, category, valid_from)
+    severidade: ALTA
+    criterio: "1 linha por loja x categoria x valid_from"
+    tratamento: "quarentena de todas as versões (duas vigências no mesmo dia não têm vencedora segura)"
+    se_falhar: QUARENTENA
