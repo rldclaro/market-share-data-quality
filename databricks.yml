@@ -25,6 +25,11 @@ resources:
 
     pipeline_job:
       name: market-share-pipeline
+      # alerta: falha em qualquer task (portões, garantias, reconciliação) avisa o dono do deploy.
+      # O e-mail vem do usuário autenticado na CLI — nenhum endereço fica gravado no repositório.
+      email_notifications:
+        on_failure:
+          - ${workspace.current_user.userName}
       # sem cluster configurado -> roda em serverless (único tipo no Free Edition)
       tasks:
         - task_key: bronze
@@ -52,6 +57,25 @@ resources:
             base_parameters:
               catalog: ${var.catalog}
               load_id: "{{job.run_id}}"
+              root: ${workspace.file_path}
+
+        - task_key: gold
+          depends_on:
+            - task_key: silver_fato # Market Share só com a fato tratada e a quarentena gravada
+          notebook_task:
+            notebook_path: ./notebooks/04_gold.py
+            base_parameters:
+              catalog: ${var.catalog}
+              load_id: "{{job.run_id}}"
+              root: ${workspace.file_path}
+
+        - task_key: evidencias
+          depends_on:
+            - task_key: gold # pente fino (falha o job) + CSVs e gráficos no Volume
+          notebook_task:
+            notebook_path: ./notebooks/05_evidencias.py
+            base_parameters:
+              catalog: ${var.catalog}
               root: ${workspace.file_path}
 
 targets:
