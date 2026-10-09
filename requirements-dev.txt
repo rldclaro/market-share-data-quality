@@ -1,0 +1,4 @@
+# Testes locais (fora do Databricks): pytest -q tests/
+pyspark==4.0.1
+pyyaml>=6.0
+pytest>=8.0
