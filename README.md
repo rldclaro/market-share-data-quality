@@ -499,7 +499,9 @@ Gráficos em `docs/evidencias/graficos/`; números a partir das tabelas tratadas
 ![Share Nestlé nacional por categoria](docs/evidencias/graficos/01_share_nestle_nacional.png)
 
 1. **Nestlé tem ~37% do valor nacional** (R$ 51,3 mi de R$ 140 mi). Por categoria, o share oficial médio
-   vai de 33% (lácteos) a 43% (bebidas), com amplitude grande entre semanas (ex.: bebidas de 25% a 56%).
+   vai de 33% (lácteos) a 43% (bebidas). A semanal oscila ~6 p.p. sem persistência (autocorrelação ≈ 0;
+   ex.: bebidas de 25% a 56%), então a leitura de negócio é a média móvel de 4 semanas oficiais: só
+   bebidas muda de patamar (~48–50% no meio de 2025, volta a ~42%); as demais ficam estáveis em 33–37%.
 2. **A qualidade impediria uma leitura errada de R$ 3,1 mi** (2,2% do valor): duplicatas, preço 10×,
    picos de carga, negativos sem prova e órfãos ficaram fora do cálculo. Só as duplicatas inflariam o MS
    em R$ 583 mil.
