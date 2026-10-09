@@ -136,3 +136,9 @@
 - Matriz: obrigatórios 36/36; nice to have 11/13 (CI/CD e incremental documentados como próximos passos).
 - Pedido do Rildo: gerar as evidências dentro do projeto. Virou a 5ª task do job (`05_evidencias.py` + `src/relatorios/evidencias.py`): roda o pente fino como portão final (FALHA derruba o job), exporta CSVs e gráficos para o Volume `ms_dq.evidencias`; `scripts/baixar_evidencias.sh` traz para `docs/evidencias/`.
 - Gold, cobertura e fixes ainda não estavam commitados no repo (visto no `git status` de 08/10 23h19) — commits separados por assunto.
+
+## Etapa 10 — CI/CD e revisão das evidências
+- GitHub Actions (`ci_cd.yml`): pytest em todo push/PR; `bundle validate` + `deploy` na `main` só com CI verde. Runs #1/#2 falharam (requirements-dev ausente; `src/` desatualizado — o CI barrou deploy de código não testado); #3–#5 verdes. Matriz: nice to have 12/13.
+- Bug no gráfico 02 (visto pelo Rildo na evidência gerada): título saía "R$ 3.1 mi" — um `.replace(",", ".")` aplicado ao título inteiro desfazia a vírgula decimal do `_brl`. Correção: `_milhar()` formata cada número isoladamente → "R$ 3,1 mi em 2.191 linhas". Só apresentação; números inalterados.
+- FCT_005 e FCT_008 com 566 linhas cada: conjuntos distintos (retirada é sequencial — linha removida por FCT_005 não chega à FCT_008; valores R$ 620.614 × R$ 661.110). Coincidência da geração sintética.
+- Revisão do gráfico 01 (share Nestlé nacional): a série semanal oscila ~6 p.p. por semana sem persistência (autocorrelação ≈ 0 em todas as categorias) — ruído, não tendência. Passou a mostrar a média móvel de 4 semanas **oficiais** (semanal ao fundo, ○ nas não oficiais). Status da semana agora é explícito (não oficial se qualquer marca for não oficial), em vez de `max(ms_status)`, que dependia da ordem alfabética. Rótulos com acento (Culinários, Lácteos, Nutrição). Médias oficiais inalteradas (43/35/36/33/37%); média simples ≈ ponderada por valor (diferença ≤ 0,2 p.p.).

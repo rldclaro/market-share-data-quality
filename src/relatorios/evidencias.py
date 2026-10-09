@@ -21,6 +21,11 @@ Resolver = Callable[[str], str]
 SUPERFICIE, TINTA, TINTA2, GRADE = "#fcfcfb", "#0b0b0b", "#52514e", "#e6e5e1"
 SERIES = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100"]
 
+CATEGORIAS = {  # rótulo de exibição (a origem vem em maiúsculas sem acento)
+    "BEBIDAS": "Bebidas", "CHOCOLATES": "Chocolates", "CULINARIOS": "Culinários",
+    "LACTEOS": "Lácteos", "NUTRICAO": "Nutrição",
+}
+
 NOMES_REGRAS = {
     "FCT_001": "FCT_001 duplicata exata", "FCT_002": "FCT_002 versões conflitantes",
     "FCT_003": "FCT_003 mesma venda A e B", "FCT_004": "FCT_004 loja inexistente",
@@ -110,25 +115,7 @@ def gerar_graficos(spark: SparkSession, tabela: Resolver, destino: str) -> list[
     ms = spark.table(tabela("ms_gold.market_share"))
     arquivos = []
 
-    # 1. share Nestlé nacional por categoria (small multiples, um painel por categoria)
-    n = (ms.where("level = 'NACIONAL' AND is_own_product = 'Y'").groupBy("year_week", "category")
-           .agg(F.sum("ms_value").alias("s"), F.max("ms_status").alias("st")).toPandas().sort_values("year_week"))
-    cats = sorted(n.category.unique())
-    fig, axs = plt.subplots(1, len(cats), figsize=(15, 3.4), sharey=True)
-    for ax, c in zip(axs, cats):
-        d = n[n.category == c].reset_index(drop=True)
-        ax.plot(range(len(d)), d.s * 100, color=SERIES[0], lw=2)
-        nao = d[d.st != "OFICIAL"]
-        ax.scatter(nao.index, nao.s * 100, s=36, facecolor=SUPERFICIE, edgecolor=SERIES[0], lw=1.5, zorder=3)
-        oficial = d[d.st == "OFICIAL"].s.mean() * 100
-        ax.set_title(f"{c.title()} · média oficial {oficial:.0f}%", fontsize=11, color=TINTA, loc="left")
-        ax.set_ylim(0, 65)
-        ax.set_xticks([0, len(d) - 1])
-        ax.set_xticklabels([d.year_week.iloc[0], d.year_week.iloc[-1]])
-    axs[0].set_ylabel("Share Nestlé (%, valor)")
-    fig.suptitle("Share Nestlé nacional por categoria · ○ = semana não oficial (cobertura ou semana aberta)",
-                 x=0.01, ha="left", fontsize=12)
-    arquivos.append(_salvar(fig, plt, destino, "01_share_nestle_nacional.png"))
+    arquivos.append(_grafico_share_nacional(plt, ms, destino))
 
     # 2. valor retido por regra da fato
     r = (spark.table(tabela("ms_dq.quarantine")).where("alvo = 'fato_vendas'").groupBy("regra_id")
@@ -193,6 +180,39 @@ def gerar_graficos(spark: SparkSession, tabela: Resolver, destino: str) -> list[
     ax.set_title("Cobertura declarada pelos fornecedores, por semana", loc="left", fontsize=12)
     arquivos.append(_salvar(fig, plt, destino, "04_cobertura_semanal.png"))
     return arquivos
+
+
+def _grafico_share_nacional(plt, ms: DataFrame, destino: str) -> str:
+    """Share Nestlé nacional por categoria (um painel por categoria).
+
+    A série semanal oscila ~6 p.p. de uma semana para outra sem persistência (autocorrelação ≈ 0),
+    então a leitura de negócio é a média móvel de 4 semanas, calculada só com semanas oficiais.
+    A semanal fica ao fundo, com as semanas não oficiais marcadas.
+    """
+    # semana não oficial se QUALQUER marca da célula for não oficial (explícito, não depende de ordem alfabética)
+    n = (ms.where("level = 'NACIONAL' AND is_own_product = 'Y'").groupBy("year_week", "category")
+           .agg(F.sum("ms_value").alias("s"),
+                F.max(F.when(F.col("ms_status") != "OFICIAL", 1).otherwise(0)).alias("nao_oficial"))
+           .toPandas().sort_values("year_week"))
+    cats = sorted(n.category.unique())
+    fig, axs = plt.subplots(1, len(cats), figsize=(15, 3.6), sharey=True)
+    for ax, c in zip(axs, cats):
+        d = n[n.category == c].reset_index(drop=True)
+        oficial = d.s.where(d.nao_oficial == 0) * 100
+        mm4 = oficial.rolling(4, min_periods=3).mean()
+        ax.plot(d.index, d.s * 100, color=SERIES[0], lw=1, alpha=0.35)
+        ax.plot(d.index, mm4, color=SERIES[0], lw=2.2)
+        nao = d[d.nao_oficial == 1]
+        ax.scatter(nao.index, nao.s * 100, s=30, facecolor=SUPERFICIE, edgecolor=SERIES[0], lw=1.5, zorder=3)
+        ax.set_title(f"{CATEGORIAS.get(c, c.title())} · média oficial {oficial.mean():.0f}%",
+                     fontsize=11, color=TINTA, loc="left")
+        ax.set_ylim(0, 65)
+        ax.set_xticks([0, len(d) - 1])
+        ax.set_xticklabels([d.year_week.iloc[0], d.year_week.iloc[-1]])
+    axs[0].set_ylabel("Share Nestlé (%, valor)")
+    fig.suptitle("Share Nestlé nacional por categoria · linha forte = média móvel de 4 semanas oficiais; "
+                 "fundo = semanal; ○ = semana não oficial", x=0.01, ha="left", fontsize=12)
+    return _salvar(fig, plt, destino, "01_share_nestle_nacional.png")
 
 
 def _salvar(fig, plt, destino: str, nome: str) -> str:
