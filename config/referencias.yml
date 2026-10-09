@@ -67,3 +67,112 @@ loja:
     lat_sul: -33.751944 # 33°45'07" S  Arroio Chuí (RS)
     lon_leste: -34.792778 # 34°47'34" W  Ponta do Seixas (PB)
     lon_oeste: -73.990556 # 73°59'26" W  nascente do rio Moa (AC)
+
+fato:
+  # Harmonização: coluna canônica <- coluna de origem de cada fornecedor.
+  # Coluna obrigatória ausente interrompe o pipeline (ING_002); coluna nova não mapeada vira alerta (ING_003).
+  fornecedores:
+    A:
+      tabela: fact_provider_a
+      obrigatorias:
+        year_week: week
+        store_id: store_id
+        ean: ean
+        units: units
+        sales_value_brl: sales_value_brl
+        sold_volume: sold_volume
+        source_file: source_file
+        ingestion_ts: ingestion_timestamp
+      opcionais:
+        average_price: average_price
+      legado: # colunas antigas que devem bater com as padronizadas (ING_004)
+        sales_value: sales_value_brl
+        sales_volume: sold_volume
+    B:
+      tabela: fact_provider_b
+      obrigatorias:
+        year_week: reference_week
+        store_id: customer_code
+        ean: product_ean
+        units: unit_count
+        sales_value_brl: sales_value_brl
+        sold_volume: sold_volume
+        source_file: source_file
+        ingestion_ts: load_date
+      opcionais:
+        competitor_flag: competitor_flag
+        market: market
+      legado:
+        revenue: sales_value_brl
+        qty_kg: sold_volume
+
+  # Tolerância da prova "unidades x preço médio = valor" (FCT_007 / FCT_013): 1% + R$ 0,05
+  tolerancia_preco_pct: 0.01
+  tolerancia_preco_abs: 0.05
+
+  # FCT_009 — faixa de preço unitário (mediana = robusta a até 50% de valores ruins)
+  faixa_preco:
+    fator_local: 3.0 # série loja x produto com histórico: [mediana/3, mediana*3]
+    fator_produto: 20.0 # sem histórico local: [mediana/20, mediana*20] — o preço legítimo varia ~18x entre lojas
+    min_obs_produto: 20
+
+  # FCT_010/011/012 — anomalias por série fornecedor x loja x produto (mediana + MAD, sem limite global)
+  serie:
+    min_semanas: 26 # histórico mínimo para ter baseline local
+    z_robusto: 3.5 # |x - mediana| / (1,4826 * MAD)
+    razao_alta: 3.0 # e x >= 3x a mediana da própria série
+    razao_baixa: 0.33 # ou x <= 1/3 da mediana (queda)
+    razao_extrema: 20.0 # pico >= 20x ...
+    max_semanas_pico: 2 # ... com duração <= 2 semanas -> provável erro de carga
+
+  sem_territorio: SEM_TERRITORIO
+
+  # Tratativa da quarentena da fato: o que fazer com cada regra e quem resolve.
+  # Alimenta a view ms_dq.vw_quarentena_fato (fila de trabalho para o time de dados / fornecedor).
+  tratativa_quarentena:
+    FCT_001:
+      {
+        acao: "Nenhuma: cópia idêntica descartada com justificativa",
+        responsavel: "-",
+      }
+    FCT_002:
+      {
+        acao: "Fornecedor informar qual versão é a válida (ou enviar nº de versão)",
+        responsavel: FORNECEDOR,
+      }
+    FCT_003:
+      {
+        acao: "Definir precedência entre fornecedores para a mesma loja",
+        responsavel: NEGOCIO,
+      }
+    FCT_004:
+      {
+        acao: "Fornecedor corrigir o código da loja ou cadastro incluir a loja",
+        responsavel: FORNECEDOR / CADASTRO,
+      }
+    FCT_005:
+      {
+        acao: "Cadastro incluir o EAN ou fornecedor corrigir o código",
+        responsavel: CADASTRO,
+      }
+    FCT_006: { acao: "Incluir a semana no calendário", responsavel: DADOS }
+    FCT_008:
+      {
+        acao: "Fornecedor confirmar se é devolução, estorno ou erro",
+        responsavel: FORNECEDOR,
+      }
+    FCT_009:
+      {
+        acao: "Fornecedor reenviar o valor (preço fora da ordem de grandeza)",
+        responsavel: FORNECEDOR,
+      }
+    FCT_010:
+      {
+        acao: "Fornecedor confirmar ou reenviar a carga da semana",
+        responsavel: FORNECEDOR,
+      }
+    ING_005:
+      {
+        acao: "Fornecedor reenviar a linha com tipos válidos",
+        responsavel: FORNECEDOR,
+      }

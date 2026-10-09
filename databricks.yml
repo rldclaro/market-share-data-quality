@@ -44,6 +44,16 @@ resources:
               load_id: "{{job.run_id}}"
               root: ${workspace.file_path} # raiz do projeto no workspace (para importar src/ e ler config/)
 
+        - task_key: silver_fato
+          depends_on:
+            - task_key: silver_dimensoes # a fato depende das dimensões tratadas
+          notebook_task:
+            notebook_path: ./notebooks/03_silver_fato.py
+            base_parameters:
+              catalog: ${var.catalog}
+              load_id: "{{job.run_id}}"
+              root: ${workspace.file_path}
+
 targets:
   dev:
     mode: development # prefixa os recursos com [dev seu_usuario] e não agenda nada

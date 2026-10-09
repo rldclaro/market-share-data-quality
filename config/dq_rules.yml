@@ -19,6 +19,43 @@ regras:
     tratamento: "alerta; divergência interrompe o pipeline"
     se_falhar: APROVADO_COM_ALERTA
 
+  # ------------------------------------------------------------------ INGESTÃO DAS FATOS
+  - id: ING_002
+    descricao: Colunas obrigatórias presentes no arquivo do fornecedor
+    dimensao: VALIDADE
+    escopo: schema de cada fornecedor (config/referencias.yml)
+    severidade: CRITICA
+    criterio: "todas as colunas obrigatórias do mapeamento existem na origem"
+    tratamento: "interrompe o pipeline: sem a coluna, a harmonização perderia o dado em silêncio"
+    se_falhar: REJEITADO
+
+  - id: ING_003
+    descricao: Coluna nova não mapeada (schema drift)
+    dimensao: VALIDADE
+    escopo: schema de cada fornecedor
+    severidade: BAIXA
+    criterio: "nenhuma coluna fora do mapeamento"
+    tratamento: "alerta: a coluna é preservada na Bronze e precisa ser avaliada antes de entrar no modelo"
+    se_falhar: APROVADO_COM_ALERTA
+
+  - id: ING_004
+    descricao: Colunas legadas iguais às padronizadas
+    dimensao: CONSISTENCIA
+    escopo: A (sales_value, sales_volume) e B (revenue, qty_kg)
+    severidade: MEDIA
+    criterio: "legado == padronizado"
+    tratamento: "alerta; a coluna padronizada prevalece"
+    se_falhar: APROVADO_COM_ALERTA
+
+  - id: ING_005
+    descricao: Tipos válidos (semana, números e data de ingestão)
+    dimensao: VALIDADE
+    escopo: fato
+    severidade: CRITICA
+    criterio: "year_week AAAA-SS; units, valor e volume numéricos e preenchidos; ingestion_ts é data/hora"
+    tratamento: "quarentena com o texto original (a Bronze guarda tudo como string)"
+    se_falhar: QUARENTENA
+
   - id: FCT_001
     descricao: Duplicata exata na fato
     dimensao: UNICIDADE
@@ -39,6 +76,172 @@ regras:
       em geral do mesmo arquivo e o preço médio é incoerente entre elas; sem número de versão,
       a carga mais recente não prova ser a correta
     se_falhar: QUARENTENA
+
+  - id: FCT_003
+    descricao: Mesma chave reportada pelos fornecedores A e B
+    dimensao: CONSISTENCIA
+    escopo: semana x loja x EAN
+    severidade: ALTA
+    criterio: "a chave aparece em um fornecedor só (as fontes são complementares)"
+    tratamento: "quarentena das duas versões: não há regra de precedência entre fornecedores acordada"
+    se_falhar: QUARENTENA
+
+  - id: FCT_004
+    descricao: Loja existe na dim_loja
+    dimensao: INTEGRIDADE_REFERENCIAL
+    escopo: fato.store_id
+    severidade: CRITICA
+    criterio: "store_id existe em ms_silver.dim_loja"
+    tratamento: "quarentena: sem rede, canal e UF não há como alocar a venda no Market Share (ex.: UNKNOWN_*)"
+    se_falhar: QUARENTENA
+
+  - id: FCT_005
+    descricao: Produto existe na dim_produto
+    dimensao: INTEGRIDADE_REFERENCIAL
+    escopo: fato.ean
+    severidade: CRITICA
+    criterio: "ean existe em ms_silver.dim_produto"
+    tratamento: "quarentena: sem categoria não existe denominador do Market Share (ex.: 9990...)"
+    se_falhar: QUARENTENA
+
+  - id: FCT_006
+    descricao: Semana existe no calendário
+    dimensao: INTEGRIDADE_REFERENCIAL
+    escopo: fato.year_week
+    severidade: CRITICA
+    criterio: "year_week existe em ms_silver.dim_calendario"
+    tratamento: "quarentena"
+    se_falhar: QUARENTENA
+
+  - id: FCT_007
+    descricao: Valor negativo com sinal invertido comprovado
+    dimensao: ACURACIA
+    escopo: fato.sales_value_brl (fornecedor A)
+    severidade: ALTA
+    criterio: "valor < 0, unidades > 0 e |unidades x preço médio + valor| <= 1% (+ R$ 0,05)"
+    tratamento: >
+      corrige para o valor absoluto; original em sales_value_brl_raw. Prova: unidades x preço médio
+      reproduz o valor com o sinal trocado. Só o fornecedor A tem preço médio
+    se_falhar: CORRIGIDO_AUTOMATICAMENTE
+
+  - id: FCT_008
+    descricao: Valor negativo sem prova de sinal invertido
+    dimensao: VALIDADE
+    escopo: fato.sales_value_brl
+    severidade: ALTA
+    criterio: "valor >= 0 depois da FCT_007"
+    tratamento: "quarentena: pode ser devolução, estorno ou erro; corrigir mudaria o Market Share sem prova"
+    se_falhar: QUARENTENA
+
+  - id: FCT_009
+    descricao: Preço unitário dentro da faixa do produto
+    dimensao: ACURACIA
+    escopo: valor / unidades
+    severidade: CRITICA
+    criterio: "preço unitário entre mediana/k e mediana*k (local: série loja x produto; fallback: produto)"
+    tratamento: "quarentena: unidades normais com valor desproporcional (ex.: preço 28x) é erro de valor"
+    se_falhar: QUARENTENA
+
+  - id: FCT_010
+    descricao: Pico extremo de curta duração na série
+    dimensao: ACURACIA
+    escopo: série fornecedor x loja x produto
+    severidade: CRITICA
+    criterio: "unidades >= 20x a mediana da série, por no máximo 2 semanas seguidas"
+    tratamento: "quarentena: provável erro de carga; o fator real é desconhecido, então não dá para corrigir"
+    se_falhar: QUARENTENA
+
+  - id: FCT_011
+    descricao: Evento atípico sustentado na série
+    dimensao: ACURACIA
+    escopo: série fornecedor x loja x produto
+    severidade: MEDIA
+    criterio: "z robusto > 3,5 e unidades >= 3x a mediana, sem ser pico extremo curto"
+    tratamento: "alerta: pode ser promoção ou evento real; o Market Share publica o % do valor sob alerta"
+    se_falhar: APROVADO_COM_ALERTA
+
+  - id: FCT_012
+    descricao: Queda atípica na série
+    dimensao: ACURACIA
+    escopo: série fornecedor x loja x produto
+    severidade: MEDIA
+    criterio: "z robusto < -3,5 e unidades <= 1/3 da mediana"
+    tratamento: "alerta: possível cobertura parcial da loja"
+    se_falhar: APROVADO_COM_ALERTA
+
+  - id: FCT_013
+    descricao: Valor coerente com unidades x preço médio
+    dimensao: CONSISTENCIA
+    escopo: fato (fornecedor A)
+    severidade: MEDIA
+    criterio: "|valor - unidades x preço médio| <= 1% (+ R$ 0,05)"
+    tratamento: "alerta"
+    se_falhar: APROVADO_COM_ALERTA
+
+  - id: FCT_014
+    descricao: Unidades zeradas com valor positivo
+    dimensao: COMPLETUDE
+    escopo: fato.units
+    severidade: MEDIA
+    criterio: "não (unidades = 0 e valor > 0)"
+    tratamento: "alerta: o Market Share em valor continua válido; em unidades fica subestimado"
+    se_falhar: APROVADO_COM_ALERTA
+
+  - id: FCT_015
+    descricao: Volume zerado com unidades positivas
+    dimensao: COMPLETUDE
+    escopo: fato.sold_volume
+    severidade: MEDIA
+    criterio: "não (volume = 0 e unidades > 0)"
+    tratamento: "alerta: o Market Share em volume fica subestimado"
+    se_falhar: APROVADO_COM_ALERTA
+
+  - id: FCT_016
+    descricao: Venda zero explícita
+    dimensao: COBERTURA
+    escopo: fato
+    severidade: INFO
+    criterio: "unidades = 0, volume = 0 e valor = 0"
+    tratamento: "aprovado: é ausência real de venda informada pelo fornecedor (prova cobertura da loja)"
+    se_falhar: APROVADO
+
+  - id: FCT_017
+    descricao: Semana fechada no momento da ingestão
+    dimensao: TEMPORALIDADE
+    escopo: year_week x ingestion_ts
+    severidade: ALTA
+    criterio: "ingestion_ts depois do fim da semana"
+    tratamento: "alerta: a semana é tratada como ABERTA e o Market Share dela não é oficial"
+    se_falhar: APROVADO_COM_ALERTA
+
+  - id: FCT_018
+    descricao: Território encontrado para a venda
+    dimensao: COMPLETUDE
+    escopo: fato.territory_id
+    severidade: BAIXA
+    criterio: "território vigente na semana (loja x categoria) ou da dim_loja"
+    tratamento: "alerta; a venda vai para SEM_TERRITORIO (o Market Share nacional e por rede não é afetado)"
+    se_falhar: APROVADO_COM_ALERTA
+
+  - id: FCT_019
+    descricao: competitor_flag coerente com o cadastro de produto
+    dimensao: CONSISTENCIA
+    escopo: fato.competitor_flag (fornecedor B)
+    severidade: MEDIA
+    criterio: "competitor_flag = Y <=> is_own_product = N"
+    tratamento: "alerta; o cadastro prevalece"
+    se_falhar: APROVADO_COM_ALERTA
+
+  - id: FCT_020
+    descricao: Volume reconcilia com unidades x embalagem do cadastro
+    dimensao: ACURACIA
+    escopo: fato.sold_volume (dataset)
+    severidade: MEDIA
+    criterio: "volume ≈ unidades x package_kg_l"
+    tratamento: >
+      regra de dataset: o volume informado não acompanha a embalagem. Premissa de unidade: kg
+      (rótulo qty_kg do fornecedor B). Market Share em volume publicado como secundário
+    se_falhar: APROVADO_COM_ALERTA
 
   # ------------------------------------------------------------------ dimensão de produto
   - id: PRD_001

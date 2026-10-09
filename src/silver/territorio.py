@@ -36,7 +36,7 @@ class TerritorioBuilder:
 
         # TER_004 — loja do histórico precisa existir na dimensão
         lojas = dim_loja.select("store_id", F.lit(True).alias("_loja_existe"))
-        df = df.join(lojas, "store_id", "left")
+        df = df.join(F.broadcast(lojas), "store_id", "left")          # dim_loja (2.500) é o lado menor
         df = e.quarantine(df, "TER_004", F.col("_loja_existe").isNull(), alvo=ALVO, chave=chave, col_valor=None)
         df = df.drop("_loja_existe")
 
@@ -61,7 +61,7 @@ class TerritorioBuilder:
 
         # TER_003 — lojas da dimensão sem nenhuma vigência (regra de dataset)
         total = dim_loja.select("store_id").distinct().count()
-        sem_hist = dim_loja.select("store_id").distinct().join(df.select("store_id").distinct(),
+        sem_hist = dim_loja.select("store_id").distinct().join(F.broadcast(df.select("store_id").distinct()),
                                                                "store_id", "left_anti").count()
         e.record("TER_003", ALVO, avaliados=total, falhas=sem_hist,
                  detalhes="na fato o território vem de dim_loja.territory_id (fallback)")
