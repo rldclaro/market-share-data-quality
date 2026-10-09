@@ -34,6 +34,11 @@ def _brl(v: float) -> str:
     return f"{v:,.1f}".replace(",", ";").replace(".", ",").replace(";", ".")
 
 
+def _milhar(n: float) -> str:
+    """Inteiro com separador de milhar brasileiro: 2.191"""
+    return f"{n:,.0f}".replace(",", ".")
+
+
 # ------------------------------------------------------------------ pente fino
 def pente_fino(spark: SparkSession, sql_texto: str, catalog: str) -> DataFrame:
     """Executa sql/validacao/00_pente_fino.sql trocando o catálogo fixo pelo do ambiente."""
@@ -131,13 +136,14 @@ def gerar_graficos(spark: SparkSession, tabela: Resolver, destino: str) -> list[
     fig, ax = plt.subplots(figsize=(9, 4.2))
     ax.barh([NOMES_REGRAS.get(x, x) for x in r.regra_id], r.v / 1e3, color=SERIES[0], height=0.6)
     for i, (v, l) in enumerate(zip(r.v / 1e3, r.linhas)):
-        ax.text(v + r.v.max() / 1e3 * 0.012, i, f"R$ {v:,.0f} mil · {l} linhas".replace(",", "."),
+        ax.text(v + r.v.max() / 1e3 * 0.012, i, f"R$ {_milhar(v)} mil · {_milhar(l)} linhas",
                 va="center", color=TINTA2, fontsize=9)
     ax.set_xlabel("Valor retido (R$ mil)")
     ax.grid(axis="y", visible=False)
     ax.set_xlim(0, r.v.max() / 1e3 * 1.45)
-    ax.set_title(f"Fora do Market Share: R$ {_brl(r.v.sum() / 1e6)} mi em {int(r.linhas.sum()):,} linhas"
-                 .replace(",", "."), loc="left", fontsize=12)
+    # cada número formatado isoladamente: um replace no título inteiro desfazia a vírgula decimal do _brl
+    ax.set_title(f"Fora do Market Share: R$ {_brl(r.v.sum() / 1e6)} mi em {_milhar(r.linhas.sum())} linhas",
+                 loc="left", fontsize=12)
     arquivos.append(_salvar(fig, plt, destino, "02_valor_retido_por_regra.png"))
 
     # 3. % de células oficiais por recorte (barra 100% empilhada)
