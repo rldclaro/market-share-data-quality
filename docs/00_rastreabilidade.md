@@ -56,7 +56,7 @@ Validação final: `sql/validacao/00_pente_fino.sql` — **41/41 OK** no Databri
 | N05 | Configuração externa de regras | ✅ | `config/dq_rules.yml`, `config/referencias.yml` |
 | N06 | Logs estruturados | ✅ | `ms_dq.rule_results`, `quarantine`, `corrections`, `bronze_load_log` (Delta) |
 | N07 | Delta Lake | ✅ | todas as camadas em Delta; `replaceWhere`; time travel da Gold |
-| N08 | CI/CD | 🟨 | base pronta (Asset Bundle, targets); pipeline de CI descrito em Próximas melhorias |
+| N08 | CI/CD | ✅ | `.github/workflows/ci_cd.yml`: pytest a cada push/PR; `bundle validate` + `deploy` na `main` após CI verde; segredos no GitHub Secrets |
 | N09 | Processamento incremental | 🟨 | full reprocess idempotente; estratégia incremental em Próximas melhorias |
 | N10 | Idempotência | ✅ | overwrite por camada, `replaceWhere` por alvo, `DECIMAL`, sem dependência de relógio |
 | N11 | Schema drift | ✅ | ING_003 + Bronze toda string |
