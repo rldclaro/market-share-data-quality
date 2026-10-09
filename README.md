@@ -34,6 +34,7 @@ manter rastreabilidade do dado original.
 | `docs/` | matriz de requisitos e notas do projeto |
 | `docs/evidencias/` | resultados exportados (pente fino, log de regras, quarentena, MS nacional) e gráficos |
 | `tests/` | testes automatizados (pytest) do motor e das regras críticas |
+| `.github/workflows/` | CI/CD: testes a cada push, deploy do bundle na `main` |
 | `scripts/` | automação do ambiente (Databricks CLI) |
 | `src/dq/` | framework de Data Quality (classes reutilizáveis) |
 | `src/silver/` | regras de tratamento de cada entidade da Silver (produto, loja, território, calendário, fato, cobertura) |
@@ -395,6 +396,18 @@ Tabela materializada (e não só view) para validar **antes** de publicar, ter h
 do que foi publicado e custo previsível; views para contrato estável e acesso mínimo (o consumidor
 recebe permissão na view, não na tabela).
 
+## CI/CD (`.github/workflows/ci_cd.yml`)
+
+| Etapa | Quando | O que faz |
+|---|---|---|
+| **CI** | todo push e pull request | Python 3.11 + Java 17, `pytest` (13 testes) |
+| **CD** | push na `main`, **só se o CI passou** | `databricks bundle validate` + `bundle deploy -t dev`; no disparo manual, opção de executar o `pipeline_job` |
+
+Credenciais só em **GitHub Secrets** (`DATABRICKS_HOST`, `DATABRICKS_TOKEN`), nunca no repositório;
+o workflow tem permissão só de leitura no código e o ambiente `dev` do GitHub pode exigir aprovação
+manual antes do deploy. Para produção: novo target `prd` no `databricks.yml` (`mode: production`,
+identidade de serviço) e um job de deploy com aprovação obrigatória.
+
 ## Monitoramento
 
 | Onde | O que mostra |
@@ -558,13 +571,12 @@ calcula avaliados, falhas e valor impactado em uma única passada por regra.
 - **Liberação da quarentena.** Tabela `ms_dq.quarantine_decisoes` (chave, LIBERAR/DESCARTAR, responsável,
   data, justificativa) aplicada na execução seguinte, com a flag de quem liberou.
 - **Precedência entre fornecedores** configurável para a FCT_003, depois de acordada com o negócio.
-- **Ambientes e agenda:** targets `hml`/`prd` no bundle, CI/CD (GitHub Actions: `bundle validate` no PR,
-  `bundle deploy -t prd` no merge) e agendamento semanal depois do prazo de entrega do fornecedor.
+- **Ambientes e agenda:** targets `hml`/`prd` no bundle (o CI/CD já publica em `dev`), service principal
+  no lugar do token pessoal e agendamento semanal depois do prazo de entrega do fornecedor.
 - **Processamento incremental.** Hoje cada execução reprocessa tudo (127 mil linhas, ~5 min) — simples e
   idempotente. Com volume de produção: carregar só os arquivos novos (Auto Loader), reprocessar apenas as
   semanas afetadas e gravar com `replaceWhere` por `year_week` (ou `MERGE` pela chave), recalculando as
   séries com a janela de histórico necessária para a baseline.
-- **Testes no CI:** rodar o `pytest` a cada PR (GitHub Actions) antes do `bundle deploy`.
 
 ## Dados sensíveis
 
