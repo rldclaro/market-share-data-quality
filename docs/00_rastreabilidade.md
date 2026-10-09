@@ -8,7 +8,7 @@ Validação final: `sql/validacao/00_pente_fino.sql` — **41/41 OK** no Databri
 
 | # | Requisito | Seção | Status | Evidência |
 |---|---|---|---|---|
-| E01 | Solução em PySpark integrando todos os datasets | §3, §4 | ✅ | job `market-share-pipeline` (4 tasks); `src/silver/*`, `src/gold/*`; os 7 datasets usados (o de contatos excluído por LGPD, D11) |
+| E01 | Solução em PySpark integrando todos os datasets | §3, §4 | ✅ | job `market-share-pipeline` (5 tasks: bronze → silver_dimensoes → silver_fato → gold → evidencias); `src/silver/*`, `src/gold/*`; os 7 datasets usados (o de contatos excluído por LGPD, D11) |
 | E02 | Identificar problemas em dimensões e fatos | §3 | ✅ | `sql/profiling/01–06`; README › Camadas (tabelas de regras com volumes) |
 | E03 | Tratamento automático só quando houver regra segura | §3, §6 | ✅ | correções com prova (PRD_005/006/007, LOJ_002/003, TER_001, CAL_001/004, FCT_007); sem prova → alerta (LOJ_004, PRD_003) ou quarentena (FCT_002/003/008/009/010); README › Q2 |
 | E04 | Preservar rastreabilidade (dado original) | §3, §8 | ✅ | Bronze imutável com `_source_file`, `_row_hash`, `_load_id`; `<coluna>_raw`; `ms_dq.corrections`; payload em `ms_dq.quarantine`; README › Q3 |
@@ -43,7 +43,7 @@ Validação final: `sql/validacao/00_pente_fino.sql` — **41/41 OK** no Databri
 | E33 | Dados tratados/amostras, quarentena e relatório de validações | §9 | ✅ | task `evidencias` (`notebooks/05_evidencias.py`) gera e `scripts/baixar_evidencias.sh` traz para `docs/evidencias/`: pente fino (41/41), rule_results, quarentena (resumo + amostra), MS nacional, amostra da fato, gráficos |
 | E34 | Testes automatizados ou evidências de validação | §9 | ✅ | `tests/` (13 testes pytest, casos de borda) + garantias que falham o job + pente fino como última task do job (41 verificações); README › Testes e validação |
 | E35 | Arquitetura de operação e monitoramento | §9 | ✅ | README › Arquitetura, Como executar (job), Monitoramento, Q7 |
-| E36 | Apresentação, documento técnico e/ou notebook | §9 | ✅ | `notebooks/01–04` (markdown explicativo) + README |
+| E36 | Apresentação, documento técnico e/ou notebook | §9 | ✅ | `notebooks/01–05` (markdown explicativo) + README |
 
 ## Nice to have
 
@@ -56,7 +56,7 @@ Validação final: `sql/validacao/00_pente_fino.sql` — **41/41 OK** no Databri
 | N05 | Configuração externa de regras | ✅ | `config/dq_rules.yml`, `config/referencias.yml` |
 | N06 | Logs estruturados | ✅ | `ms_dq.rule_results`, `quarantine`, `corrections`, `bronze_load_log` (Delta) |
 | N07 | Delta Lake | ✅ | todas as camadas em Delta; `replaceWhere`; time travel da Gold |
-| N08 | CI/CD | ✅ | `.github/workflows/ci_cd.yml`: pytest a cada push/PR; `bundle validate` + `deploy` na `main` após CI verde; segredos no GitHub Secrets |
+| N08 | CI/CD | ✅ | `.github/workflows/ci_cd.yml`: pytest a cada push/PR; `bundle validate` + `deploy` na `main` após CI verde; segredos no GitHub Secrets; run verde no GitHub Actions (CI · testes + CD · deploy) |
 | N09 | Processamento incremental | 🟨 | full reprocess idempotente; estratégia incremental em Próximas melhorias |
 | N10 | Idempotência | ✅ | overwrite por camada, `replaceWhere` por alvo, `DECIMAL`, sem dependência de relógio |
 | N11 | Schema drift | ✅ | ING_003 + Bronze toda string |
