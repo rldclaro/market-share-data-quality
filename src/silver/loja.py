@@ -66,14 +66,18 @@ class LojaBuilder:
         r = por_cidade.agg((F.max("lat_m") - F.min("lat_m")).alias("amp_lat"),
                            (F.max("lon_m") - F.min("lon_m")).alias("amp_lon"),
                            F.avg("lat_dp").alias("dp_lat")).first()
-        corr = base.agg(F.corr("lat", "lon").alias("c")).first()["c"]
+        # correlação com try_divide: coordenada constante não pode derrubar o pipeline (ANSI)
+        c = base.agg(F.try_divide(F.covar_pop("lat", "lon"),
+                                  F.stddev_pop("lat") * F.stddev_pop("lon")).alias("c")).first()["c"]
+        corr = c if c is not None else 0.0
         n = base.count()
+        amp, dp = r["amp_lat"] or 0.0, r["dp_lat"] or 0.0
         # centros quase iguais (variação menor que a dispersão interna) => coordenada não acompanha a cidade
-        nao_confiavel = r["amp_lat"] < r["dp_lat"]
+        nao_confiavel = dp > 0 and amp < dp
         self.engine.record(
             "LOJ_005", ALVO, avaliados=n, falhas=n if nao_confiavel else 0,
-            detalhes=(f"centro médio por cidade varia {r['amp_lat']:.2f}° (lat) e {r['amp_lon']:.2f}° (lon); "
-                      f"dispersão interna {r['dp_lat']:.2f}°; correlação lat x lon {corr:.3f}. "
+            detalhes=(f"centro médio por cidade varia {amp:.2f}° (lat) e {(r['amp_lon'] or 0.0):.2f}° (lon); "
+                      f"dispersão interna {dp:.2f}°; correlação lat x lon {corr:.3f}. "
                       "Campo fora do Market Share; melhoria: endereço + CEP + geocodificação"),
         )
 

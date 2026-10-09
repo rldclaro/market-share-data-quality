@@ -12,48 +12,11 @@ produto:
   hierarquia_evidencia_minima: 0.90
 
   # Colunas de texto padronizadas (trim + maiúsculas + espaço único)
-  colunas_texto:
-    [
-      product_description,
-      brand,
-      manufacturer,
-      category,
-      subcategory,
-      package_unit,
-    ]
+  colunas_texto: [product_description, brand, manufacturer, category, subcategory, package_unit]
 
 loja:
   # Domínio oficial de UF (27 unidades da federação)
-  ufs_validas:
-    [
-      AC,
-      AL,
-      AP,
-      AM,
-      BA,
-      CE,
-      DF,
-      ES,
-      GO,
-      MA,
-      MT,
-      MS,
-      MG,
-      PA,
-      PB,
-      PR,
-      PE,
-      PI,
-      RJ,
-      RN,
-      RS,
-      RO,
-      RR,
-      SC,
-      SP,
-      SE,
-      TO,
-    ]
+  ufs_validas: [AC, AL, AP, AM, BA, CE, DF, ES, GO, MA, MT, MS, MG, PA, PB, PR, PE, PI, RJ, RN, RS, RO, RR, SC, SP, SE, TO]
 
   # A UF de cada cidade é DERIVADA dos dados (UF dominante entre as lojas com UF válida).
   # Só corrige se a concordância for >= este limite (mesmo critério da hierarquia de produto).
@@ -63,10 +26,10 @@ loja:
   # Fonte: IBGE, Brasil em Síntese – Dados geográficos
   # https://brasilemsintese.ibge.gov.br/territorio/dados-geograficos.html
   limites_brasil:
-    lat_norte: 5.271944 # 05°16'19" N  Monte Caburaí (RR)
-    lat_sul: -33.751944 # 33°45'07" S  Arroio Chuí (RS)
-    lon_leste: -34.792778 # 34°47'34" W  Ponta do Seixas (PB)
-    lon_oeste: -73.990556 # 73°59'26" W  nascente do rio Moa (AC)
+    lat_norte:  5.271944     # 05°16'19" N  Monte Caburaí (RR)
+    lat_sul:   -33.751944    # 33°45'07" S  Arroio Chuí (RS)
+    lon_leste: -34.792778    # 34°47'34" W  Ponta do Seixas (PB)
+    lon_oeste: -73.990556    # 73°59'26" W  nascente do rio Moa (AC)
 
 fato:
   # Harmonização: coluna canônica <- coluna de origem de cada fornecedor.
@@ -85,7 +48,7 @@ fato:
         ingestion_ts: ingestion_timestamp
       opcionais:
         average_price: average_price
-      legado: # colunas antigas que devem bater com as padronizadas (ING_004)
+      legado:                      # colunas antigas que devem bater com as padronizadas (ING_004)
         sales_value: sales_value_brl
         sales_volume: sold_volume
     B:
@@ -112,70 +75,34 @@ fato:
 
   # FCT_009 — faixa de preço unitário (mediana = robusta a até 50% de valores ruins)
   faixa_preco:
-    fator_local: 3.0 # série loja x produto com histórico: [mediana/3, mediana*3]
-    fator_produto: 20.0 # sem histórico local: [mediana/20, mediana*20] — o preço legítimo varia ~18x entre lojas
+    fator_local: 3.0     # série loja x produto com histórico: [mediana/3, mediana*3]
+    fator_produto: 20.0  # sem histórico local: [mediana/20, mediana*20] — o preço legítimo varia ~18x entre lojas
     min_obs_produto: 20
 
   # FCT_010/011/012 — anomalias por série fornecedor x loja x produto (mediana + MAD, sem limite global)
   serie:
-    min_semanas: 26 # histórico mínimo para ter baseline local
-    z_robusto: 3.5 # |x - mediana| / (1,4826 * MAD)
-    razao_alta: 3.0 # e x >= 3x a mediana da própria série
-    razao_baixa: 0.33 # ou x <= 1/3 da mediana (queda)
-    razao_extrema: 20.0 # pico >= 20x ...
-    max_semanas_pico: 2 # ... com duração <= 2 semanas -> provável erro de carga
+    min_semanas: 26        # histórico mínimo para ter baseline local
+    z_robusto: 3.5         # |x - mediana| / (1,4826 * MAD)
+    razao_alta: 3.0        # e x >= 3x a mediana da própria série
+    razao_baixa: 0.33      # ou x <= 1/3 da mediana (queda)
+    razao_extrema: 20.0    # pico >= 20x ...
+    max_semanas_pico: 2    # ... com duração <= 2 semanas -> provável erro de carga
 
   sem_territorio: SEM_TERRITORIO
 
   # Tratativa da quarentena da fato: o que fazer com cada regra e quem resolve.
   # Alimenta a view ms_dq.vw_quarentena_fato (fila de trabalho para o time de dados / fornecedor).
   tratativa_quarentena:
-    FCT_001:
-      {
-        acao: "Nenhuma: cópia idêntica descartada com justificativa",
-        responsavel: "-",
-      }
-    FCT_002:
-      {
-        acao: "Fornecedor informar qual versão é a válida (ou enviar nº de versão)",
-        responsavel: FORNECEDOR,
-      }
-    FCT_003:
-      {
-        acao: "Definir precedência entre fornecedores para a mesma loja",
-        responsavel: NEGOCIO,
-      }
-    FCT_004:
-      {
-        acao: "Fornecedor corrigir o código da loja ou cadastro incluir a loja",
-        responsavel: FORNECEDOR / CADASTRO,
-      }
-    FCT_005:
-      {
-        acao: "Cadastro incluir o EAN ou fornecedor corrigir o código",
-        responsavel: CADASTRO,
-      }
-    FCT_006: { acao: "Incluir a semana no calendário", responsavel: DADOS }
-    FCT_008:
-      {
-        acao: "Fornecedor confirmar se é devolução, estorno ou erro",
-        responsavel: FORNECEDOR,
-      }
-    FCT_009:
-      {
-        acao: "Fornecedor reenviar o valor (preço fora da ordem de grandeza)",
-        responsavel: FORNECEDOR,
-      }
-    FCT_010:
-      {
-        acao: "Fornecedor confirmar ou reenviar a carga da semana",
-        responsavel: FORNECEDOR,
-      }
-    ING_005:
-      {
-        acao: "Fornecedor reenviar a linha com tipos válidos",
-        responsavel: FORNECEDOR,
-      }
+    FCT_001: {acao: "Nenhuma: cópia idêntica descartada com justificativa", responsavel: "-"}
+    FCT_002: {acao: "Fornecedor informar qual versão é a válida (ou enviar nº de versão)", responsavel: FORNECEDOR}
+    FCT_003: {acao: "Definir precedência entre fornecedores para a mesma loja", responsavel: NEGOCIO}
+    FCT_004: {acao: "Fornecedor corrigir o código da loja ou cadastro incluir a loja", responsavel: FORNECEDOR / CADASTRO}
+    FCT_005: {acao: "Cadastro incluir o EAN ou fornecedor corrigir o código", responsavel: CADASTRO}
+    FCT_006: {acao: "Incluir a semana no calendário", responsavel: DADOS}
+    FCT_008: {acao: "Fornecedor confirmar se é devolução, estorno ou erro", responsavel: FORNECEDOR}
+    FCT_009: {acao: "Fornecedor reenviar o valor (preço fora da ordem de grandeza)", responsavel: FORNECEDOR}
+    FCT_010: {acao: "Fornecedor confirmar ou reenviar a carga da semana", responsavel: FORNECEDOR}
+    ING_005: {acao: "Fornecedor reenviar a linha com tipos válidos", responsavel: FORNECEDOR}
 
 gold:
   # Recortes do Market Share (nível -> colunas da célula). NACIONAL = Brasil inteiro.
@@ -187,10 +114,9 @@ gold:
     TERRITORIO: [territory_id]
 
   # Portões de publicação: a célula (semana x categoria x recorte) só é OFICIAL se passar nos três
-  cobertura_minima: 0.80 # lojas cobertas / lojas esperadas (cobertura declarada pelo fornecedor)
-  quarentena_maxima_pct: 0.05 # linhas da fato em quarentena / (consumíveis + quarentena)
-  tolerancia_soma_ms: 0.0001 # Σ shares da célula = 1 (GLD_003)
+  cobertura_minima: 0.80           # lojas cobertas / lojas esperadas (cobertura declarada pelo fornecedor)
+  quarentena_maxima_pct: 0.05      # linhas da fato em quarentena / (consumíveis + quarentena)
+  tolerancia_soma_ms: 0.0001       # Σ shares da célula = 1 (GLD_003)
 
   # Nunca podem chegar à camada de consumo (GLD_005)
-  colunas_proibidas:
-    [contact_name, contact_email, contact_phone, cnpj, latitude, longitude]
+  colunas_proibidas: [contact_name, contact_email, contact_phone, cnpj, latitude, longitude]

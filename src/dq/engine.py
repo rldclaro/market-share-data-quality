@@ -66,6 +66,10 @@ class DQEngine:
         self._resultados: list[ResultadoRegra] = []
         self._quarentena: list[DataFrame] = []
         self._correcoes: list[DataFrame] = []
+        # alvos que passaram por quarantine()/correct() nesta execução (mesmo com 0 falhas):
+        # só eles têm a quarentena/trilha substituída no flush. Um alvo que aparece apenas em
+        # record()/check() nunca apaga a quarentena gravada por outra etapa.
+        self._alvos_com_saida: set[str] = set()
 
     # ------------------------------------------------------------------ estatísticas
     def _estatisticas(self, df: DataFrame, avaliado: Column, col_valor: str | None):
@@ -108,6 +112,7 @@ class DQEngine:
         - cada alteração gera uma linha de auditoria (antes -> depois);
         - a condição é calculada ANTES de alterar o dado, para a correção não mudar o próprio resultado.
         """
+        self._alvos_com_saida.add(alvo)
         df, av = self._prepara(df, falha, avaliado)
         n_av, n_fl, vl = self._estatisticas(df, av, col_valor)
         self.record(regra_id, alvo, n_av, n_fl, detalhes, vl)
@@ -137,6 +142,7 @@ class DQEngine:
                    col_valor: str | None = "sales_value_brl", detalhes: str = "") -> DataFrame:
         """Retira do fluxo os registros que falham e guarda o payload original para investigação."""
         regra = self.catalogo[regra_id]
+        self._alvos_com_saida.add(alvo)
         df, av = self._prepara(df, falha, avaliado)
         n_av, n_fl, vl = self._estatisticas(df, av, col_valor)
         self.record(regra_id, alvo, n_av, n_fl, detalhes, vl)
@@ -201,7 +207,9 @@ class DQEngine:
              .write.format("delta").mode("append").option("mergeSchema", "true")
              .saveAsTable(f"{schema_dq}.rule_results"))
 
-        alvos = sorted({r.alvo for r in self._resultados})
+        alvos = sorted(self._alvos_com_saida)
+        if not alvos:
+            return
         filtro = "alvo IN ({})".format(", ".join(f"'{a}'" for a in alvos))
         for nome, frames in (("quarantine", self._quarentena), ("corrections", self._correcoes)):
             tabela = f"{schema_dq}.{nome}"

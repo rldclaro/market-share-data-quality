@@ -158,7 +158,8 @@ class FatoBuilder:
 
         elegivel = (F.col("series_weeks") >= s["min_semanas"]) & (F.col("series_median_units") > 0)
         razao = F.try_divide(F.col("units"), F.col("series_median_units"))       # ANSI: sem divisão por zero
-        escala = F.when(F.col("series_mad_units") > 0, 1.4826 * F.col("series_mad_units"))
+        # MAD = 0 (série constante): escala mínima de 1 unidade, senão um pico nunca seria detectado
+        escala = F.when(F.col("series_mad_units") > 0, 1.4826 * F.col("series_mad_units")).otherwise(F.lit(1.0))
         z = F.try_divide(F.col("units") - F.col("series_median_units"), escala)
         df = (df.withColumn("series_ratio", F.when(elegivel, F.round(razao, 3)))
                 .withColumn("series_robust_z", F.when(elegivel, F.round(z, 2)))
