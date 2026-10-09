@@ -243,6 +243,127 @@ regras:
       (rótulo qty_kg do fornecedor B). Market Share em volume publicado como secundário
     se_falhar: APROVADO_COM_ALERTA
 
+  # ------------------------------------------------------------------ COBERTURA DO FORNECEDOR (coverage_provider)
+  - id: COV_001
+    descricao: Chave de cobertura única
+    dimensao: UNICIDADE
+    escopo: fornecedor x semana x rede
+    severidade: CRITICA
+    criterio: "1 linha por provider, year_week, retailer_name"
+    tratamento: "quarentena"
+    se_falhar: QUARENTENA
+
+  - id: COV_002
+    descricao: Lojas recebidas não excedem as esperadas
+    dimensao: CONSISTENCIA
+    escopo: coverage_provider.received_stores
+    severidade: MEDIA
+    criterio: "received_stores <= expected_stores"
+    tratamento: "a cobertura usa min(recebidas, esperadas) — nunca passa de 100% — e alerta"
+    se_falhar: APROVADO_COM_ALERTA
+
+  - id: COV_003
+    descricao: Arquivo recebido com zero lojas
+    dimensao: CONSISTENCIA
+    escopo: file_received x received_stores
+    severidade: MEDIA
+    criterio: "não (file_received = Y e received_stores = 0)"
+    tratamento: "cobertura 0 (conservador) + alerta"
+    se_falhar: APROVADO_COM_ALERTA
+
+  - id: COV_004
+    descricao: Arquivo declarado como não recebido, mas com dados na fato
+    dimensao: CONSISTENCIA
+    escopo: file_received x fato
+    severidade: MEDIA
+    criterio: "não (file_received = N e existem linhas na fato)"
+    tratamento: "cobertura 0 (conservador: o metadado diz que não chegou) + alerta para investigar o metadado"
+    se_falhar: APROVADO_COM_ALERTA
+
+  - id: COV_005
+    descricao: Entrega dentro do prazo
+    dimensao: TEMPORALIDADE
+    escopo: actual_delivery_date x expected_delivery_date
+    severidade: BAIXA
+    criterio: "actual_delivery_date <= expected_delivery_date"
+    tratamento: "alerta (indicador de pontualidade do fornecedor)"
+    se_falhar: APROVADO_COM_ALERTA
+
+  - id: COV_006
+    descricao: Entrega esperada depois do fim da semana
+    dimensao: TEMPORALIDADE
+    escopo: expected_delivery_date x week_end_date
+    severidade: MEDIA
+    criterio: "expected_delivery_date > week_end_date"
+    tratamento: >
+      alerta: a entrega esperada é 3 dias ANTES do fim da semana, ou seja, antes de a semana fechar.
+      Semântica do prazo a validar com o fornecedor
+    se_falhar: APROVADO_COM_ALERTA
+
+  - id: COV_007
+    descricao: Rede e semana existem nas dimensões
+    dimensao: INTEGRIDADE_REFERENCIAL
+    escopo: coverage_provider.retailer_name / year_week
+    severidade: ALTA
+    criterio: "retailer_name existe na dim_loja e year_week no calendário"
+    tratamento: "quarentena"
+    se_falhar: QUARENTENA
+
+  - id: COV_008
+    descricao: Lojas declaradas x lojas observadas na fato
+    dimensao: RECONCILIACAO
+    escopo: received_stores x fato
+    severidade: BAIXA
+    criterio: "lojas distintas na fato <= received_stores"
+    tratamento: "alerta: a fato traz só linhas com movimento, então a reconciliação exata não é possível"
+    se_falhar: APROVADO_COM_ALERTA
+
+  # ------------------------------------------------------------------ GOLD (portões de publicação)
+  - id: GLD_001
+    descricao: Conservação de registros Bronze -> Silver + quarentena
+    dimensao: RECONCILIACAO
+    escopo: fato
+    severidade: CRITICA
+    criterio: "linhas da Bronze = Silver + quarentena + rejeitados"
+    tratamento: "falha a publicação"
+    se_falhar: REJEITADO
+
+  - id: GLD_002
+    descricao: Joins não duplicam valor (fan-out)
+    dimensao: RECONCILIACAO
+    escopo: Silver consumível x Gold
+    severidade: CRITICA
+    criterio: "Σ valor Silver consumível = Σ valor Gold = Σ valor do Market Share nacional"
+    tratamento: "falha a publicação"
+    se_falhar: REJEITADO
+
+  - id: GLD_003
+    descricao: Shares somam 100% em cada célula
+    dimensao: CONSISTENCIA
+    escopo: market_share
+    severidade: CRITICA
+    criterio: "|Σ ms_value - 1| <= tolerância, por semana x categoria x recorte"
+    tratamento: "falha a publicação"
+    se_falhar: REJEITADO
+
+  - id: GLD_004
+    descricao: Célula com qualidade suficiente para ser oficial
+    dimensao: COBERTURA
+    escopo: célula de Market Share
+    severidade: ALTA
+    criterio: "semana fechada, cobertura >= 80% e quarentena <= 5%"
+    tratamento: "o share é calculado, mas ms_value_official fica nulo e ms_status explica o motivo"
+    se_falhar: APROVADO_COM_ALERTA
+
+  - id: GLD_005
+    descricao: Sem dados pessoais ou sensíveis na camada de consumo
+    dimensao: VALIDADE
+    escopo: tabelas Gold
+    severidade: CRITICA
+    criterio: "nenhuma coluna de contato, CNPJ ou coordenada"
+    tratamento: "falha a publicação"
+    se_falhar: REJEITADO
+
   # ------------------------------------------------------------------ dimensão de produto
   - id: PRD_001
     descricao: product_id único no cadastro

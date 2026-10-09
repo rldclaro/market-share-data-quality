@@ -176,3 +176,21 @@ fato:
         acao: "Fornecedor reenviar a linha com tipos válidos",
         responsavel: FORNECEDOR,
       }
+
+gold:
+  # Recortes do Market Share (nível -> colunas da célula). NACIONAL = Brasil inteiro.
+  niveis:
+    NACIONAL: []
+    REDE: [retailer_name]
+    CANAL: [channel]
+    UF: [state]
+    TERRITORIO: [territory_id]
+
+  # Portões de publicação: a célula (semana x categoria x recorte) só é OFICIAL se passar nos três
+  cobertura_minima: 0.80 # lojas cobertas / lojas esperadas (cobertura declarada pelo fornecedor)
+  quarentena_maxima_pct: 0.05 # linhas da fato em quarentena / (consumíveis + quarentena)
+  tolerancia_soma_ms: 0.0001 # Σ shares da célula = 1 (GLD_003)
+
+  # Nunca podem chegar à camada de consumo (GLD_005)
+  colunas_proibidas:
+    [contact_name, contact_email, contact_phone, cnpj, latitude, longitude]
