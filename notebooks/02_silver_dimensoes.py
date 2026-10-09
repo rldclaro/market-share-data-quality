@@ -179,26 +179,36 @@ engine.flush(DQ)
 
 # MAGIC %md
 # MAGIC ## Fila de revalidação de cadastro (loja)
-# MAGIC Pendências que o pipeline **não corrige** (ou corrige só aqui) e que precisam ser resolvidas na origem.
+# MAGIC Pendências que precisam ser resolvidas **na origem** (cadastro/CRM). `tratamento_pipeline` diz se a Silver
+# MAGIC já corrigiu (UF) ou só alertou (coordenada, território, vendedor); `valor_origem` x `valor_silver` mostra o antes e depois.
 
 # COMMAND ----------
 
 spark.sql(f"""
 CREATE OR REPLACE VIEW {DQ}.vw_revalidacao_loja AS
-SELECT l.store_id, l.city, l.state, f.regra_id,
+SELECT l.store_id, l.city, f.regra_id,
        CASE f.regra_id
-         WHEN 'LOJ_002' THEN 'UF incoerente com a cidade (corrigida na Silver)'
+         WHEN 'LOJ_002' THEN 'UF inválida no cadastro de origem'
          WHEN 'LOJ_004' THEN 'Coordenada fora do território brasileiro (IBGE)'
          WHEN 'LOJ_006' THEN 'Território não informado'
          WHEN 'LOJ_007' THEN 'Vendedor não informado'
        END AS problema,
        CASE f.regra_id
-         WHEN 'LOJ_002' THEN concat('UF de origem: ', coalesce(l.state_raw, '<vazio>'), ' | cidade: ', l.city)
-         WHEN 'LOJ_004' THEN concat('lat=', l.latitude, ' lon=', l.longitude, ' (', l.geo_status, ')')
-         ELSE '-'
-       END AS evidencia,
+         WHEN 'LOJ_002' THEN coalesce(l.state_raw, '<vazio>')
+         WHEN 'LOJ_004' THEN concat('lat=', l.latitude, ' lon=', l.longitude)
+         ELSE '<vazio>'
+       END AS valor_origem,
        CASE f.regra_id
-         WHEN 'LOJ_002' THEN 'Corrigir a UF no cadastro de origem'
+         WHEN 'LOJ_002' THEN l.state
+         WHEN 'LOJ_004' THEN concat('sem alteração (', l.geo_status, ')')
+         ELSE '<vazio>'
+       END AS valor_silver,
+       CASE f.regra_id
+         WHEN 'LOJ_002' THEN 'CORRIGIDO NA SILVER (UF dominante da cidade)'
+         ELSE 'SOMENTE ALERTA (sem correção)'
+       END AS tratamento_pipeline,
+       CASE f.regra_id
+         WHEN 'LOJ_002' THEN 'Corrigir a UF na origem (a Silver já usa a UF correta)'
          WHEN 'LOJ_004' THEN 'Confirmar lat/lon no cadastro; enviar endereço e CEP'
          WHEN 'LOJ_006' THEN 'Atribuir território no CRM'
          WHEN 'LOJ_007' THEN 'Atribuir vendedor no CRM'
@@ -208,4 +218,4 @@ LATERAL VIEW explode(l.dq_flags) f AS regra_id
 WHERE f.regra_id IN ('LOJ_002', 'LOJ_004', 'LOJ_006', 'LOJ_007')
 """)
 
-display(spark.sql(f"SELECT regra_id, problema, count(*) AS lojas FROM {DQ}.vw_revalidacao_loja GROUP BY ALL ORDER BY regra_id"))
+display(spark.sql(f"SELECT regra_id, problema, tratamento_pipeline, count(*) AS lojas FROM {DQ}.vw_revalidacao_loja GROUP BY ALL ORDER BY regra_id"))

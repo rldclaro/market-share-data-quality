@@ -123,6 +123,55 @@ display(fv.groupBy("territory_source").count())
 
 # COMMAND ----------
 
+# MAGIC %md
+# MAGIC ## Fila de tratativa da quarentena
+# MAGIC Uma linha por regra x fornecedor x semana: quanto está retido, exemplo de motivo, o que fazer e
+# MAGIC quem resolve (`config/referencias.yml -> fato.tratativa_quarentena`). Quando o fornecedor reenvia
+# MAGIC o arquivo corrigido, a reexecução do job tira o registro da quarentena sozinha (replaceWhere por alvo).
+
+# COMMAND ----------
+
+def sql_texto(v: str) -> str:
+    return "'" + str(v).replace("'", "''") + "'"
+
+tratativa = ",\n    ".join(
+    f"({sql_texto(r)}, {sql_texto(t['acao'])}, {sql_texto(t['responsavel'])})"
+    for r, t in referencias["fato"]["tratativa_quarentena"].items()
+)
+
+spark.sql(f"""
+CREATE OR REPLACE VIEW {DQ}.vw_quarentena_fato AS
+WITH tratativa AS (
+  SELECT * FROM VALUES
+    {tratativa}
+  AS t(regra_id, acao_sugerida, responsavel)
+)
+SELECT q.regra_id, q.classificacao, q.severidade,
+       get_json_object(q.chave, '$.provider')  AS provider,
+       get_json_object(q.chave, '$.year_week') AS year_week,
+       COUNT(*)                               AS linhas,
+       ROUND(SUM(abs(q.valor_brl)), 2)        AS valor_retido_brl,   -- abs: mesmo critério do valor_impactado_brl do log
+       MIN(q.motivo)                          AS exemplo_motivo,
+       COLLECT_SET(q.arquivo_origem)          AS arquivos,
+       coalesce(t.acao_sugerida, 'Analisar')  AS acao_sugerida,
+       coalesce(t.responsavel, 'DADOS')       AS responsavel,
+       MAX(q.run_id)                          AS run_id
+FROM {DQ}.quarantine q
+LEFT JOIN tratativa t ON t.regra_id = q.regra_id
+WHERE q.alvo = '{ALVO}'
+GROUP BY q.regra_id, q.classificacao, q.severidade, provider, year_week, t.acao_sugerida, t.responsavel
+""")
+
+display(spark.sql(f"""
+SELECT regra_id, classificacao, responsavel, acao_sugerida,
+       SUM(linhas) AS linhas, ROUND(SUM(valor_retido_brl), 2) AS valor_retido_brl
+FROM {DQ}.vw_quarentena_fato
+GROUP BY ALL
+ORDER BY regra_id
+"""))
+
+# COMMAND ----------
+
 # Intermediários do checkpoint não fazem parte do modelo
 for nome in ("fato_etapa1", "fato_etapa2"):
     spark.sql(f"DROP TABLE IF EXISTS {SILVER}.stg_{nome}")

@@ -3,7 +3,7 @@
 -- Rodar depois da task silver_fato. Tabelas: ms_bronze.fact_provider_*, ms_silver.fato_vendas, ms_dq.*
 -- =============================================================================
 
--- 1. CONSERVAÇÃO (nada some em silêncio)
+-- ------------------------------------------------------------------ 1. CONSERVAÇÃO (nada some em silêncio)
 -- 1.1 Bronze = Silver + quarentena + rejeitados (diferenca deve ser 0)
 SELECT b.linhas_bronze, s.linhas_silver, q.retiradas, b.linhas_bronze - s.linhas_silver - q.retiradas AS diferenca
 FROM (SELECT (SELECT COUNT(*) FROM workspace.ms_bronze.fact_provider_a)
@@ -19,14 +19,14 @@ SELECT provider, linhas, valor_brl FROM (
   SELECT 'B', COUNT(*), SUM(CAST(sales_value_brl AS DECIMAL(18,2))), 2 FROM workspace.ms_bronze.fact_provider_b
 ) ORDER BY o;
 
--- 2. LOG DA ÚLTIMA EXECUÇÃO
+-- ------------------------------------------------------------------ 2. LOG DA ÚLTIMA EXECUÇÃO
 SELECT regra_id, avaliados, falhas, pct_falha, valor_impactado_brl, resultado, detalhes
 FROM workspace.ms_dq.rule_results
 WHERE run_id = (SELECT max_by(run_id, executado_em) FROM workspace.ms_dq.rule_results WHERE alvo = 'fato_vendas')
   AND (alvo = 'fato_vendas' OR alvo LIKE 'fornecedor_%')
 ORDER BY regra_id;
 
--- 3. QUARENTENA E REJEITADOS
+-- ------------------------------------------------------------------ 3. QUARENTENA E REJEITADOS
 -- 3.1 Por regra e fornecedor, com valor
 SELECT regra_id, classificacao, get_json_object(chave, '$.provider') AS provider,
        COUNT(*) AS linhas, ROUND(SUM(valor_brl), 2) AS valor_brl
@@ -54,7 +54,20 @@ WHERE alvo = 'fato_vendas' AND regra_id IN ('FCT_009', 'FCT_010')
 ORDER BY regra_id, valor_brl DESC
 LIMIT 20;
 
--- 4. CORREÇÕES
+-- 3.4 Fila de tratativa (view): resumo por regra, com ação e responsável
+SELECT regra_id, classificacao, responsavel, acao_sugerida,
+       SUM(linhas) AS linhas, ROUND(SUM(valor_retido_brl), 2) AS valor_retido_brl
+FROM workspace.ms_dq.vw_quarentena_fato
+GROUP BY ALL
+ORDER BY regra_id;
+
+-- 3.5 Fila de tratativa detalhada: o que mandar para cada fornecedor, por semana
+SELECT provider, year_week, regra_id, linhas, valor_retido_brl, exemplo_motivo, arquivos, acao_sugerida
+FROM workspace.ms_dq.vw_quarentena_fato
+WHERE responsavel LIKE 'FORNECEDOR%'
+ORDER BY provider, year_week, regra_id;
+
+-- ------------------------------------------------------------------ 4. CORREÇÕES
 -- 4.1 Sinal invertido (FCT_007): a prova é unidades x preço médio = -valor original
 SELECT provider, year_week, store_id, ean, units, average_price,
        ROUND(units * average_price, 2) AS unidades_x_preco,
@@ -68,7 +81,7 @@ LIMIT 20;
 SELECT (SELECT COUNT(*) FROM workspace.ms_dq.corrections WHERE regra_id = 'FCT_007') AS na_trilha,
        (SELECT COUNT(*) FROM workspace.ms_silver.fato_vendas WHERE array_contains(dq_flags, 'FCT_007')) AS na_silver;
 
--- 5. ALERTAS
+-- ------------------------------------------------------------------ 5. ALERTAS
 -- 5.1 Distribuição dos alertas (uma linha pode ter mais de um)
 SELECT flag AS regra_id, provider, COUNT(*) AS linhas, ROUND(SUM(sales_value_brl), 2) AS valor_brl
 FROM workspace.ms_silver.fato_vendas LATERAL VIEW explode(dq_flags) f AS flag
@@ -105,7 +118,7 @@ WHERE store_id = 'S00009' AND category = 'NUTRICAO' AND year_week BETWEEN '2025-
 GROUP BY ALL
 ORDER BY year_week;
 
--- 6. GARANTIAS (todas devem retornar 0)
+-- ------------------------------------------------------------------ 6. GARANTIAS (todas devem retornar 0)
 SELECT 'chave semana x loja x EAN duplicada' AS garantia,
        COUNT(*) - COUNT(DISTINCT year_week, store_id, ean) AS violacoes FROM workspace.ms_silver.fato_vendas
 UNION ALL
