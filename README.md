@@ -13,6 +13,8 @@ manter rastreabilidade do dado original.
 - PySpark + Delta Lake
 - Unity Catalog (schemas, tabelas e volumes)
 - Databricks CLI / Asset Bundles
+- PyYAML (biblioteca adicional): catálogo de regras e referências em YAML, fora do código — regra e
+  parâmetro mudam por revisão de configuração, sem alterar PySpark, e ficam legíveis para o negócio
 
 ## Arquitetura (Unity Catalog)
 
@@ -29,14 +31,17 @@ manter rastreabilidade do dado original.
 | Pasta | Conteúdo |
 |---|---|
 | `data/raw/` | dados de entrada do case (não alterados) |
-| `docs/` | documentação e matriz de requisitos |
+| `docs/` | matriz de requisitos e notas do projeto |
+| `docs/evidencias/` | resultados exportados (pente fino, log de regras, quarentena, MS nacional) e gráficos |
+| `tests/` | testes automatizados (pytest) do motor e das regras críticas |
 | `scripts/` | automação do ambiente (Databricks CLI) |
 | `src/dq/` | framework de Data Quality (classes reutilizáveis) |
 | `src/silver/` | regras de tratamento de cada entidade da Silver (produto, loja, território, calendário, fato, cobertura) |
 | `src/gold/` | Market Share e portões de publicação |
+| `src/relatorios/` | pente fino, exportação das evidências e gráficos (task `evidencias`) |
 | `config/` | catálogo de regras de DQ (`dq_rules.yml`) e referências das correções (`referencias.yml`) |
 | `sql/profiling/` | consultas que evidenciam cada problema encontrado (antes do tratamento) |
-| `sql/validacao/` | consultas que provam o tratamento: trilha, reconciliação log × trilha e garantias |
+| `sql/validacao/` | consultas que provam o tratamento: pente fino (41 verificações), trilha, reconciliação e garantias |
 | `notebooks/` | notebooks do pipeline, um por task do job (formato `.py`, versionável) |
 | `notebooks/dev/` | notebooks de validação do ambiente e do framework (fora do pipeline) |
 | `databricks.yml` | definição do projeto como código (Databricks Asset Bundle) |
@@ -80,11 +85,11 @@ e cria os jobs definidos em `databricks.yml`. Os dados não são enviados pelo b
 databricks bundle run -t dev pipeline_job --profile gf7
 ```
 
-O job `market-share-pipeline` executa 4 tasks em sequência; se uma falha, as seguintes não rodam
+O job `market-share-pipeline` executa 5 tasks em sequência; se uma falha, as seguintes não rodam
 (dado ruim não se propaga):
 
 ```
-bronze → silver_dimensoes → silver_fato → gold
+bronze → silver_dimensoes → silver_fato → gold → evidencias
 ```
 
 | Task | Notebook | Saída |
@@ -93,6 +98,16 @@ bronze → silver_dimensoes → silver_fato → gold
 | `silver_dimensoes` | `02_silver_dimensoes.py` | `ms_silver.dim_produto`, `dim_loja`, `territorio_historico`, `dim_calendario` + fila `ms_dq.vw_revalidacao_loja` |
 | `silver_fato` | `03_silver_fato.py` | `ms_silver.fato_vendas` + fila `ms_dq.vw_quarentena_fato` |
 | `gold` | `04_gold.py` | `ms_silver.cobertura_fornecedor`, `ms_gold.*` e as views de consumo |
+| `evidencias` | `05_evidencias.py` | pente fino (falha o job se houver `FALHA`) + CSVs e gráficos no Volume `ms_dq.evidencias` |
+
+### 5. Trazer as evidências para o repositório
+
+```bash
+./scripts/baixar_evidencias.sh            # perfil e catálogo opcionais: ./scripts/baixar_evidencias.sh gf7 workspace
+```
+
+Copia o Volume `ms_dq.evidencias` para `docs/evidencias/` (pente fino, log de regras, quarentena, Market
+Share nacional, amostra da fato e os gráficos), gerados pelo job a partir das tabelas publicadas.
 
 Todos os jobs rodam em computação serverless (único tipo disponível no Free Edition).
 Para desenvolvimento interativo, abra o notebook na pasta do bundle e selecione **Serverless**.
@@ -392,9 +407,29 @@ recebe permissão na view, não na tabela).
 | `ms_gold.market_share.ms_status` | por que cada célula não é oficial |
 | `sql/validacao/*.sql` | reconciliação log × trilha × quarentena e garantias (todas devem dar 0) |
 
+**Alerta por e-mail:** o job notifica o dono do deploy em qualquer falha (`email_notifications` no
+`databricks.yml`, com o usuário da CLI — nenhum e-mail no repositório).
+
+**Pente fino:** `sql/validacao/00_pente_fino.sql` — uma consulta com 41 verificações (Bronze, Silver, DQ
+e Gold), esperado × obtido; critério de entrega: todas `OK`.
+
 **Alertas que o job dispara sozinho:** reconciliação da Bronze, unicidade das dimensões, UF fora do
 domínio, vigência sobreposta, calendário quebrado, conservação da fato, chave duplicada, valor negativo
 e os portões GLD — qualquer um falha a task e interrompe as seguintes.
+
+## Testes e validação
+
+Três camadas, do código ao dado publicado:
+
+| Camada | O quê | Onde |
+|---|---|---|
+| **Testes unitários** | 13 testes com DataFrames pequenos e casos de borda: motor (check/correct/quarantine, NULL não vira falha, precedência de status, flush só limpa os próprios alvos), UF pela cidade, CNPJ, coordenada **não** alterada, vigência SCD2, calendário ISO, negativo só corrige com prova, pico × evento, `unionByName` A + B | `tests/` — `pip install -r requirements-dev.txt && pytest -q tests/` |
+| **Garantias no job** | asserts em cada notebook e portões GLD: falham a task e bloqueiam as seguintes | `notebooks/*`, `src/gold/market_share.py` |
+| **Pente fino** | 41 verificações ponta a ponta (Bronze → Gold), esperado × obtido — roda como última task do job e o falha se houver `FALHA` | `sql/validacao/00_pente_fino.sql` · resultado em `docs/evidencias/pente_fino.csv` (41/41 OK) |
+
+Os testes acharam e corrigiram dois casos de borda antes de chegarem a produção: coordenadas constantes
+derrubariam a LOJ_005 (divisão por zero no modo ANSI) e uma série perfeitamente constante (MAD = 0)
+esconderia um pico de 30×. As correções não mudaram nenhum resultado nos dados do case.
 
 ## Respostas às perguntas do case
 
@@ -446,11 +481,18 @@ permissões por schema (consumidor só nas views).
 
 ## Insights
 
+Gráficos em `docs/evidencias/graficos/`; números a partir das tabelas tratadas.
+
+![Share Nestlé nacional por categoria](docs/evidencias/graficos/01_share_nestle_nacional.png)
+
 1. **Nestlé tem ~37% do valor nacional** (R$ 51,3 mi de R$ 140 mi). Por categoria, o share oficial médio
    vai de 33% (lácteos) a 43% (bebidas), com amplitude grande entre semanas (ex.: bebidas de 25% a 56%).
 2. **A qualidade impediria uma leitura errada de R$ 3,1 mi** (2,2% do valor): duplicatas, preço 10×,
    picos de carga, negativos sem prova e órfãos ficaram fora do cálculo. Só as duplicatas inflariam o MS
    em R$ 583 mil.
+
+   ![Valor retido por regra](docs/evidencias/graficos/02_valor_retido_por_regra.png)
+
 3. **Cobertura é o maior limitador do MS oficial:** 28% das células fornecedor × semana × rede estão
    abaixo de 80%; no recorte por rede, 25% das células não são oficiais, contra 5% no nacional.
 4. **Eventos sustentados concentram-se em 12 lojas** (S00001–S00012, até 21× a mediana por 9 semanas):
@@ -516,7 +558,13 @@ calcula avaliados, falhas e valor impactado em uma única passada por regra.
 - **Liberação da quarentena.** Tabela `ms_dq.quarantine_decisoes` (chave, LIBERAR/DESCARTAR, responsável,
   data, justificativa) aplicada na execução seguinte, com a flag de quem liberou.
 - **Precedência entre fornecedores** configurável para a FCT_003, depois de acordada com o negócio.
-- **Ambientes e agenda:** targets `hml`/`prd` no bundle, CI/CD e agendamento semanal.
+- **Ambientes e agenda:** targets `hml`/`prd` no bundle, CI/CD (GitHub Actions: `bundle validate` no PR,
+  `bundle deploy -t prd` no merge) e agendamento semanal depois do prazo de entrega do fornecedor.
+- **Processamento incremental.** Hoje cada execução reprocessa tudo (127 mil linhas, ~5 min) — simples e
+  idempotente. Com volume de produção: carregar só os arquivos novos (Auto Loader), reprocessar apenas as
+  semanas afetadas e gravar com `replaceWhere` por `year_week` (ou `MERGE` pela chave), recalculando as
+  séries com a janela de histórico necessária para a baseline.
+- **Testes no CI:** rodar o `pytest` a cada PR (GitHub Actions) antes do `bundle deploy`.
 
 ## Dados sensíveis
 
@@ -531,6 +579,7 @@ não é necessário para o cálculo de Market Share. Pela minimização da LGPD 
 
 ## Status
 
-Pipeline completo (Bronze → Silver → Gold) em produção no workspace de desenvolvimento.
+Concluído. Pipeline completo (Bronze → Silver → Gold) rodando no workspace de desenvolvimento,
+validado pelo pente fino (41/41 OK) e por 13 testes automatizados.
 Acompanhamento dos requisitos em
 [docs/00_rastreabilidade.md](docs/00_rastreabilidade.md).

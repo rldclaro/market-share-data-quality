@@ -113,3 +113,26 @@
 - **Vigências (TER_001):** 121 sobreposições CRM 2025 × MANUAL 2026 → venda duplicaria no join. Fecha em próximo início − 1 dia (SCD2). Território depende de loja × categoria. Fallback: histórico → dim_loja → SEM_TERRITORIO.
 - **Calendário (CAL_001/004) — decisão do Rildo: ISO.** Fonte misturava ISO (year_week) e civil (year/month da segunda). Quinta-feira = dia do meio = mês com 4 de 7 dias ("mês real"). 1 ano + 9 meses corrigidos. Efeito: semanas por mês mudam; 2026-40 vai para outubro.
 - Princípio consolidado: corrige o que tem prova (UF, CNPJ, vigência, calendário); alerta o que não tem (coordenada, EAN malformado); toda correção com `_raw` + `corrections` + reconciliação log × trilha (`sql/validacao`).
+
+## Etapa 6 — fato A + B
+- Harmonização por configuração + `unionByName(allowMissingColumns=True)` (casa por nome). ING_002 interrompe, ING_003 alerta drift.
+- Ordem: retira → corrige → alerta. Conservação 127.052 = 124.861 + 2.191 (assert no notebook).
+- Decisões padrão confirmadas pelo Rildo: A×B quarentena; negativo corrige só com prova (A, units×preço); preço fora da faixa e pico curto → quarentena; evento sustentado → alerta; volume em kg (secundário); território pela quinta-feira.
+- Rildo pediu broadcast em todo join com tabela menor e unionByName: aplicado nas dimensões; agregados por série (~119 mil, quase o tamanho da fato) ficam sem broadcast de propósito (escala; AQE decide).
+- Erro do Databricks Assistant: sugeriu limiares inventados (fator 3, min 5 semanas) — rejeitados, mudariam o resultado sem base.
+- Fila de tratativa `vw_quarentena_fato` (ação + responsável no YAML); `vw_revalidacao_loja` com valor_origem × valor_silver (pedido do Rildo para ficar claro que a Silver já corrigiu).
+
+## Etapa 7 — Gold
+- Cobertura conservadora (não recebido = 0; recebidas ≤ esperadas). Separa ausência de venda × ausência de cobertura.
+- MS por valor (principal) e volume; 5 recortes; mesma base no numerador e denominador.
+- Portões: staging → validação → publicação. GLD_001/002/003/005 bloqueiam; GLD_004 marca não oficial com motivo.
+- Bug evitado: flush apagaria a quarentena da fato (GLD_001 com alvo fato_vendas) → motor passou a limpar só alvos com quarantine/correct.
+- Tabela + views (oficial, Nestlé, cobertura). LGPD: contatos nunca ingeridos + GLD_005.
+
+## Etapa 8/9 — validação e fechamento
+- Pente fino: 41 verificações, 41/41 OK no Databricks.
+- pytest: 13 testes; acharam 2 casos de borda (corr com coordenada constante; MAD = 0), corrigidos sem mudar resultados.
+- Evidências exportadas + 4 gráficos; alerta por e-mail no job (usuário da CLI, sem e-mail no repo).
+- Matriz: obrigatórios 36/36; nice to have 11/13 (CI/CD e incremental documentados como próximos passos).
+- Pedido do Rildo: gerar as evidências dentro do projeto. Virou a 5ª task do job (`05_evidencias.py` + `src/relatorios/evidencias.py`): roda o pente fino como portão final (FALHA derruba o job), exporta CSVs e gráficos para o Volume `ms_dq.evidencias`; `scripts/baixar_evidencias.sh` traz para `docs/evidencias/`.
+- Gold, cobertura e fixes ainda não estavam commitados no repo (visto no `git status` de 08/10 23h19) — commits separados por assunto.

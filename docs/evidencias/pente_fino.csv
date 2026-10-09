@@ -1,0 +1,42 @@
+camada,verificacao,esperado,obtido,status
+Bronze,dim_produto: linhas,1235,1235,OK
+Bronze,dim_loja: linhas,2500,2500,OK
+Bronze,dim_calendario: linhas,91,91,OK
+Bronze,customer_territory_history: linhas,4736,4736,OK
+Bronze,coverage_provider: linhas,6370,6370,OK
+Bronze,fact_provider_a: linhas,68526,68526,OK
+Bronze,fact_provider_b: linhas,58526,58526,OK
+Bronze,arquivos divergentes do README na última carga (ING_001),0,0,OK
+Silver,dim_produto: EAN duplicado,0,0,OK
+Silver,dim_produto: produtos (1 por EAN),1200,1200,OK
+Silver,dim_produto: categoria vazia,0,0,OK
+Silver,dim_loja: store_id duplicado,0,0,OK
+Silver,dim_loja: UF fora do domínio,0,0,OK
+Silver,dim_loja: CNPJ fora de 14 dígitos,0,0,OK
+Silver,dim_loja: coordenada alterada pelo pipeline,0,0,OK
+Silver,territorio: vigências sobrepostas,0,0,OK
+Silver,calendario: semanas,91,91,OK
+Silver,calendario: ano/mês fora do ISO,0,0,OK
+Silver,fato: conservação Bronze - (Silver + quarentena),0,0,OK
+Silver,fato: chave semana x loja x EAN duplicada,0,0,OK
+Silver,fato: valor negativo,0,0,OK
+Silver,fato: loja fora da dim_loja,0,0,OK
+Silver,fato: EAN fora da dim_produto,0,0,OK
+Silver,fato: linha em quarentena/rejeitada na Silver,0,0,OK
+Silver,cobertura: chave fornecedor x semana x rede duplicada,0,0,OK
+Silver,cobertura: acima de 100%,0,0,OK
+DQ,regras no log da última execução,62,62,OK
+DQ,correções: |falhas no log - registros na trilha|,0,0,OK
+DQ,quarentena: |falhas no log - linhas na quarentena|,0,0,OK
+DQ,"quarentena sem motivo, regra ou payload",0,0,OK
+DQ,correção sem valor antes/depois,0,0,OK
+Gold,linhas: Silver consumível - Gold,0,0,OK
+Gold,valor (centavos): |Σ Gold - Σ MS nacional|,0,0,OK
+Gold,células com Σ shares ≠ 100%,0,0,OK
+Gold,oficial com cobertura < 80% ou quarentena > 5%,0,0,OK
+Gold,semana aberta (2026-40) publicada como oficial,0,0,OK
+Gold,não oficial com valor oficial preenchido,0,0,OK
+Gold,view oficial - células OFICIAL,0,0,OK
+Gold,colunas pessoais/sensíveis na Gold (LGPD),0,0,OK
+Gold,tabela de contatos sensíveis no catálogo (LGPD),0,0,OK
+Gold,portões críticos (GLD_001/002/003/005) com falha,0,0,OK

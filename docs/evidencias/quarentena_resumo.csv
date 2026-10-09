@@ -1,0 +1,10 @@
+alvo,regra_id,classificacao,severidade,linhas,valor_retido_brl,exemplo_motivo
+dim_produto,PRD_002,REJEITADO,CRITICA,35,,alias de EAN duplicado; sobrevivente = P00106
+fato_vendas,FCT_001,REJEITADO,BAIXA,500,583408.97,cópia 2 do hash 00c72d510a8a6b96
+fato_vendas,FCT_002,QUARENTENA,CRITICA,32,26937.1,versões conflitantes; arquivo=provider_a_2025-05.csv
+fato_vendas,FCT_003,QUARENTENA,ALTA,18,19881.31,mesma semana x loja x EAN informada por A e B
+fato_vendas,FCT_004,QUARENTENA,CRITICA,467,541223.79,loja inexistente na dim_loja: UNKNOWN_0
+fato_vendas,FCT_005,QUARENTENA,CRITICA,566,620614.09,EAN inexistente na dim_produto: 9990000000211
+fato_vendas,FCT_008,QUARENTENA,ALTA,566,661109.51,valor negativo sem prova de sinal invertido
+fato_vendas,FCT_009,QUARENTENA,CRITICA,24,351472.55,"preço unitário 277.20 fora da faixa LOCAL [3.30, 29.70]"
+fato_vendas,FCT_010,QUARENTENA,CRITICA,18,272562.75,pico de 23.5x a mediana da série por 1 semana(s)

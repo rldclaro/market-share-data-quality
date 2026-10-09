@@ -1,0 +1,65 @@
+run_id,regra_id,descricao,dimensao,alvo,escopo,severidade,avaliados,falhas,pct_falha,valor_impactado_brl,resultado,detalhes,executado_em
+816108031729749,COV_001,Chave de cobertura única,UNICIDADE,cobertura,fornecedor x semana x rede,CRITICA,6370,0,0.0,,APROVADO,,2026-10-09 02:55:46.757965
+816108031729749,COV_002,Lojas recebidas não excedem as esperadas,CONSISTENCIA,cobertura,coverage_provider.received_stores,MEDIA,6370,999,0.156829,,APROVADO_COM_ALERTA,,2026-10-09 02:55:46.757965
+816108031729749,COV_003,Arquivo recebido com zero lojas,CONSISTENCIA,cobertura,file_received x received_stores,MEDIA,6370,180,0.028257,,APROVADO_COM_ALERTA,,2026-10-09 02:55:46.757965
+816108031729749,COV_004,"Arquivo declarado como não recebido, mas com dados na fato",CONSISTENCIA,cobertura,file_received x fato,MEDIA,6370,73,0.01146,,APROVADO_COM_ALERTA,cobertura efetiva mantida em 0 (conservador),2026-10-09 02:55:46.757965
+816108031729749,COV_005,Entrega dentro do prazo,TEMPORALIDADE,cobertura,actual_delivery_date x expected_delivery_date,BAIXA,6370,3085,0.484301,,APROVADO_COM_ALERTA,,2026-10-09 02:55:46.757965
+816108031729749,COV_006,Entrega esperada depois do fim da semana,TEMPORALIDADE,cobertura,expected_delivery_date x week_end_date,MEDIA,6370,6370,1.0,,APROVADO_COM_ALERTA,entrega esperada = fim da semana - 3 dias; semântica a validar,2026-10-09 02:55:46.757965
+816108031729749,COV_007,Rede e semana existem nas dimensões,INTEGRIDADE_REFERENCIAL,cobertura,coverage_provider.retailer_name / year_week,ALTA,6370,0,0.0,,APROVADO,,2026-10-09 02:55:46.757965
+816108031729749,COV_008,Lojas declaradas x lojas observadas na fato,RECONCILIACAO,cobertura,received_stores x fato,BAIXA,6370,519,0.081476,,APROVADO_COM_ALERTA,a fato traz só linhas com movimento,2026-10-09 02:55:46.757965
+816108031729749,CAL_001,Ano no padrão ISO 8601 (ano da quinta-feira),CONSISTENCIA,dim_calendario,dim_calendario.year,MEDIA,91,1,0.010989,,CORRIGIDO_AUTOMATICAMENTE,ano civil da segunda-feira -> ano ISO da quinta-feira,2026-10-09 02:52:51.482131
+816108031729749,CAL_002,"Semana completa e contínua (segunda a domingo, sem lacunas)",VALIDADE,dim_calendario,dim_calendario.week_start_date / week_end_date,CRITICA,91,0,0.0,,APROVADO,,2026-10-09 02:52:51.482131
+816108031729749,CAL_003,year_week único e coerente com a data de início,UNICIDADE,dim_calendario,dim_calendario.year_week,CRITICA,91,0,0.0,,APROVADO,,2026-10-09 02:52:51.482131
+816108031729749,CAL_004,Mês no padrão ISO 8601 (mês da quinta-feira = mês real da semana),CONSISTENCIA,dim_calendario,dim_calendario.month,MEDIA,91,9,0.098901,,CORRIGIDO_AUTOMATICAMENTE,mês civil da segunda-feira -> mês ISO da quinta-feira (4 dos 7 dias),2026-10-09 02:52:51.482131
+816108031729749,LOJ_001,store_id único,UNICIDADE,dim_loja,dim_loja.store_id,CRITICA,2500,0,0.0,,APROVADO,,2026-10-09 02:52:51.482131
+816108031729749,LOJ_002,UF coerente com a cidade,CONSISTENCIA,dim_loja,dim_loja.state x city,ALTA,2500,20,0.008,,CORRIGIDO_AUTOMATICAMENTE,,2026-10-09 02:52:51.482131
+816108031729749,LOJ_003,"CNPJ com 14 dígitos, sem máscara",VALIDADE,dim_loja,dim_loja.cnpj,BAIXA,2500,35,0.014,,CORRIGIDO_AUTOMATICAMENTE,,2026-10-09 02:52:51.482131
+816108031729749,LOJ_004,Coordenada dentro do território brasileiro,VALIDADE,dim_loja,"dim_loja.latitude, dim_loja.longitude",BAIXA,2500,10,0.004,,APROVADO_COM_ALERTA,"sem correção: indício de inversão, mas sem referência para confirmar a localização",2026-10-09 02:52:51.482131
+816108031729749,LOJ_005,Coordenada coerente com a cidade da loja,ACURACIA,dim_loja,dim_loja (dataset),INFO,2490,2490,1.0,,APROVADO_COM_ALERTA,centro médio por cidade varia 1.15° (lat) e 1.19° (lon); dispersão interna 4.38°; correlação lat x lon -0.026. Campo fora do Market Share; melhoria: endereço + CEP + geocodificação,2026-10-09 02:52:51.482131
+816108031729749,LOJ_006,Território preenchido na loja,COMPLETUDE,dim_loja,dim_loja.territory_id,MEDIA,2500,90,0.036,,APROVADO_COM_ALERTA,,2026-10-09 02:52:51.482131
+816108031729749,LOJ_007,Vendedor preenchido na loja,COMPLETUDE,dim_loja,dim_loja.seller_id,BAIXA,2500,70,0.028,,APROVADO_COM_ALERTA,,2026-10-09 02:52:51.482131
+816108031729749,PRD_001,product_id único no cadastro,UNICIDADE,dim_produto,dim_produto.product_id,CRITICA,1235,0,0.0,,APROVADO,,2026-10-09 02:52:51.482131
+816108031729749,PRD_002,EAN único no cadastro (chave do join com a fato),UNICIDADE,dim_produto,dim_produto.ean,CRITICA,1235,35,0.02834,,REJEITADO,,2026-10-09 02:52:51.482131
+816108031729749,PRD_003,EAN com 13 dígitos numéricos,VALIDADE,dim_produto,dim_produto.ean,MEDIA,1200,31,0.025833,,APROVADO_COM_ALERTA,,2026-10-09 02:52:51.482131
+816108031729749,PRD_004,Texto padronizado,VALIDADE,dim_produto,dim_produto (colunas de texto),BAIXA,1235,95,0.076923,,CORRIGIDO_AUTOMATICAMENTE,,2026-10-09 02:52:51.482131
+816108031729749,PRD_005,Categoria com grafia fora do domínio oficial,VALIDADE,dim_produto,dim_produto.category,ALTA,1235,6,0.004858,,CORRIGIDO_AUTOMATICAMENTE,,2026-10-09 02:52:51.482131
+816108031729749,PRD_006,Categoria vazia,COMPLETUDE,dim_produto,dim_produto.category,ALTA,1235,3,0.002429,,CORRIGIDO_AUTOMATICAMENTE,,2026-10-09 02:52:51.482131
+816108031729749,PRD_007,"Categoria em conflito com a subcategoria, com evidência na descrição",CONSISTENCIA,dim_produto,dim_produto.category x subcategory,ALTA,1200,8,0.006667,,CORRIGIDO_AUTOMATICAMENTE,evidência: a descrição contém a subcategoria,2026-10-09 02:52:51.482131
+816108031729749,PRD_008,"Categoria em conflito com a subcategoria, sem evidência",CONSISTENCIA,dim_produto,dim_produto.category x subcategory,ALTA,1200,0,0.0,,APROVADO,,2026-10-09 02:52:51.482131
+816108031729749,FCT_001,Duplicata exata na fato,UNICIDADE,fato_vendas,fato (todas as colunas),BAIXA,127052,500,0.003935,583408.97,REJEITADO,,2026-10-09 02:54:21.409532
+816108031729749,FCT_002,Mesma chave com versões conflitantes no mesmo fornecedor,UNICIDADE,fato_vendas,semana x loja x EAN,CRITICA,126552,32,0.000253,26937.1,QUARENTENA,,2026-10-09 02:54:21.409532
+816108031729749,FCT_003,Mesma chave reportada pelos fornecedores A e B,CONSISTENCIA,fato_vendas,semana x loja x EAN,ALTA,126520,18,0.000142,19881.31,QUARENTENA,,2026-10-09 02:54:21.409532
+816108031729749,FCT_004,Loja existe na dim_loja,INTEGRIDADE_REFERENCIAL,fato_vendas,fato.store_id,CRITICA,126502,467,0.003692,541223.79,QUARENTENA,,2026-10-09 02:54:21.409532
+816108031729749,FCT_005,Produto existe na dim_produto,INTEGRIDADE_REFERENCIAL,fato_vendas,fato.ean,CRITICA,126035,566,0.004491,620614.09,QUARENTENA,,2026-10-09 02:54:21.409532
+816108031729749,FCT_006,Semana existe no calendário,INTEGRIDADE_REFERENCIAL,fato_vendas,fato.year_week,CRITICA,126502,0,0.0,,APROVADO,,2026-10-09 02:54:21.409532
+816108031729749,FCT_007,Valor negativo com sinal invertido comprovado,ACURACIA,fato_vendas,fato.sales_value_brl (fornecedor A),ALTA,125469,662,0.005276,816211.57,CORRIGIDO_AUTOMATICAMENTE,prova: unidades x preço médio = -valor,2026-10-09 02:54:21.409532
+816108031729749,FCT_008,Valor negativo sem prova de sinal invertido,VALIDADE,fato_vendas,fato.sales_value_brl,ALTA,125469,566,0.004511,661109.51,QUARENTENA,,2026-10-09 02:54:21.409532
+816108031729749,FCT_009,Preço unitário dentro da faixa do produto,ACURACIA,fato_vendas,valor / unidades,CRITICA,124903,24,0.000192,351472.55,QUARENTENA,,2026-10-09 02:54:21.409532
+816108031729749,FCT_010,Pico extremo de curta duração na série,ACURACIA,fato_vendas,série fornecedor x loja x produto,CRITICA,124879,18,0.000144,272562.75,QUARENTENA,,2026-10-09 02:54:21.409532
+816108031729749,FCT_011,Evento atípico sustentado na série,ACURACIA,fato_vendas,série fornecedor x loja x produto,MEDIA,6507,255,0.039189,1224562.1,APROVADO_COM_ALERTA,,2026-10-09 02:54:21.409532
+816108031729749,FCT_012,Queda atípica na série,ACURACIA,fato_vendas,série fornecedor x loja x produto,MEDIA,6507,0,0.0,,APROVADO,,2026-10-09 02:54:21.409532
+816108031729749,FCT_013,Valor coerente com unidades x preço médio,CONSISTENCIA,fato_vendas,fato (fornecedor A),MEDIA,67241,0,0.0,,APROVADO,,2026-10-09 02:54:21.409532
+816108031729749,FCT_014,Unidades zeradas com valor positivo,COMPLETUDE,fato_vendas,fato.units,MEDIA,124861,681,0.005454,783686.39,APROVADO_COM_ALERTA,,2026-10-09 02:54:21.409532
+816108031729749,FCT_015,Volume zerado com unidades positivas,COMPLETUDE,fato_vendas,fato.sold_volume,MEDIA,124861,900,0.007208,1092100.21,APROVADO_COM_ALERTA,,2026-10-09 02:54:21.409532
+816108031729749,FCT_016,Venda zero explícita,COBERTURA,fato_vendas,fato,INFO,124861,85,0.000681,0.0,APROVADO,,2026-10-09 02:54:21.409532
+816108031729749,FCT_017,Semana fechada no momento da ingestão,TEMPORALIDADE,fato_vendas,year_week x ingestion_ts,ALTA,124861,1308,0.010476,1465411.05,APROVADO_COM_ALERTA,,2026-10-09 02:54:21.409532
+816108031729749,FCT_018,Território encontrado para a venda,COMPLETUDE,fato_vendas,fato.territory_id,BAIXA,124861,4168,0.033381,5027167.32,APROVADO_COM_ALERTA,,2026-10-09 02:54:21.409532
+816108031729749,FCT_019,competitor_flag coerente com o cadastro de produto,CONSISTENCIA,fato_vendas,fato.competitor_flag (fornecedor B),MEDIA,57200,0,0.0,,APROVADO,,2026-10-09 02:54:21.409532
+816108031729749,FCT_020,Volume reconcilia com unidades x embalagem do cadastro,ACURACIA,fato_vendas,fato.sold_volume (dataset),MEDIA,124861,99397,0.796061,,APROVADO_COM_ALERTA,volume não acompanha a embalagem; unidade adotada: kg (rótulo qty_kg do fornecedor B),2026-10-09 02:54:21.409532
+816108031729749,ING_004,Colunas legadas iguais às padronizadas,CONSISTENCIA,fato_vendas,"A (sales_value, sales_volume) e B (revenue, qty_kg)",MEDIA,127052,0,0.0,,APROVADO,,2026-10-09 02:54:21.409532
+816108031729749,ING_005,"Tipos válidos (semana, números e data de ingestão)",VALIDADE,fato_vendas,fato,CRITICA,127052,0,0.0,,APROVADO,,2026-10-09 02:54:21.409532
+816108031729749,ING_002,Colunas obrigatórias presentes no arquivo do fornecedor,VALIDADE,fornecedor_A,schema de cada fornecedor (config/referencias.yml),CRITICA,8,0,0.0,,APROVADO,faltando=[],2026-10-09 02:54:21.409532
+816108031729749,ING_003,Coluna nova não mapeada (schema drift),VALIDADE,fornecedor_A,schema de cada fornecedor,BAIXA,11,0,0.0,,APROVADO,não mapeadas=[],2026-10-09 02:54:21.409532
+816108031729749,ING_002,Colunas obrigatórias presentes no arquivo do fornecedor,VALIDADE,fornecedor_B,schema de cada fornecedor (config/referencias.yml),CRITICA,8,0,0.0,,APROVADO,faltando=[],2026-10-09 02:54:21.409532
+816108031729749,ING_003,Coluna nova não mapeada (schema drift),VALIDADE,fornecedor_B,schema de cada fornecedor,BAIXA,12,0,0.0,,APROVADO,não mapeadas=[],2026-10-09 02:54:21.409532
+816108031729749,GLD_001,Conservação de registros Bronze -> Silver + quarentena,RECONCILIACAO,gold,fato,CRITICA,127052,0,0.0,,APROVADO,bronze=127052 silver=124861 quarentena+rejeitados=2191,2026-10-09 02:55:46.757965
+816108031729749,GLD_002,Joins não duplicam valor (fan-out),RECONCILIACAO,gold,Silver consumível x Gold,CRITICA,124861,0,0.0,,APROVADO,Σsilver=140005700.98 Σgold=140005700.98 Σms_nacional=140005700.98,2026-10-09 02:55:46.757965
+816108031729749,GLD_005,Sem dados pessoais ou sensíveis na camada de consumo,VALIDADE,gold,tabelas Gold,CRITICA,48,0,0.0,,APROVADO,vazadas=[],2026-10-09 02:55:46.757965
+816108031729749,GLD_003,Shares somam 100% em cada célula,CONSISTENCIA,market_share,market_share,CRITICA,55441,0,0.0,,APROVADO,,2026-10-09 02:55:46.757965
+816108031729749,GLD_004,Célula com qualidade suficiente para ser oficial,COBERTURA,market_share,célula de Market Share,ALTA,258873,58506,0.226003,,APROVADO_COM_ALERTA,"NAO_OFICIAL_COBERTURA=45727, NAO_OFICIAL_QUARENTENA=9895, NAO_OFICIAL_SEMANA_ABERTA=2884, OFICIAL=200365, SEM_VENDA_NA_CATEGORIA=2",2026-10-09 02:55:46.757965
+816108031729749,TER_001,Vigências sem sobreposição por loja x categoria,CONSISTENCIA,territorio_historico,customer_territory_history.valid_from / valid_to,ALTA,4736,121,0.025549,,CORRIGIDO_AUTOMATICAMENTE,vigência anterior fechada em (próximo início - 1 dia),2026-10-09 02:52:51.482131
+816108031729749,TER_002,Território preenchido no histórico,COMPLETUDE,territorio_historico,customer_territory_history.territory_id,MEDIA,4736,169,0.035684,,APROVADO_COM_ALERTA,,2026-10-09 02:52:51.482131
+816108031729749,TER_003,Loja da dimensão com histórico de território,COBERTURA,territorio_historico,dim_loja x customer_territory_history (dataset),BAIXA,2500,11,0.0044,,APROVADO_COM_ALERTA,na fato o território vem de dim_loja.territory_id (fallback),2026-10-09 02:52:51.482131
+816108031729749,TER_004,Loja do histórico existe na dim_loja,INTEGRIDADE_REFERENCIAL,territorio_historico,customer_territory_history.store_id,ALTA,4736,0,0.0,,APROVADO,,2026-10-09 02:52:51.482131
+816108031729749,TER_005,Vendedor preenchido no histórico,COMPLETUDE,territorio_historico,customer_territory_history.seller_id,BAIXA,4736,130,0.027449,,APROVADO_COM_ALERTA,,2026-10-09 02:52:51.482131
+816108031729749,TER_006,Vigência única por loja x categoria x início,UNICIDADE,territorio_historico,"customer_territory_history (store_id, category, valid_from)",ALTA,4736,0,0.0,,APROVADO,,2026-10-09 02:52:51.482131
